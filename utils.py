@@ -3,7 +3,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import collections
+
 from tensorflow.examples.tutorials.mnist import input_data
+from sklearn.model_selection import train_test_split
 
 
 def create_semisupervised_data(dataset='mnist', label_nums=100):
@@ -20,7 +23,7 @@ def create_semisupervised_data(dataset='mnist', label_nums=100):
         validation_x, test_x, validation_y, test_y = train_test_split(
                                                             test_x, test_y, 
                                                             test_size=0.5)
-        unlabeled_size = train_x.shape[0] - labeled_size
+        unlabeled_size = train_x.shape[0] - label_nums
         collections.Counter(np.argmax(labeled_y, axis=1))
         return (unlabeled_x, labeled_x, labeled_y), (validation_x, validation_y), (test_x, test_y)
 
