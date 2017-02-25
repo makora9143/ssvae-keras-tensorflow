@@ -24,7 +24,7 @@ def create_semisupervised_data(dataset='mnist', label_nums=100):
                                                             test_x, test_y, 
                                                             test_size=0.5)
         unlabeled_size = train_x.shape[0] - label_nums
-        collections.Counter(np.argmax(labeled_y, axis=1))
+        print collections.Counter(np.argmax(labeled_y, axis=1))
         return (unlabeled_x, labeled_x, labeled_y), (validation_x, validation_y), (test_x, test_y)
 
 

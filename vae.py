@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 class M2VAE(object):
     def __init__(self):
-        self.nb_epoch = 1000
+        self.nb_epoch = 2
         self.batch_size = 100
         self.z_dim = 50
         self.n_classes = 10
@@ -154,67 +154,62 @@ class M2VAE(object):
         train_step = optimizer.apply_gradients(capped_gvs)
         return train_step
 
+    def reconstruct(self, x, y=None, N=50000):
+        x_tilde = x
+        unlabeled_flg = False
+        if y is None:
+            x_tilde, y = self.create_unlabeled_data(x)
+            unlabeled_flg = True
+
+        enc_mean, enc_var2 = self._encode_z_given_xy(x_tilde, y)
+        pred = self._encode_y_given_x(x)
+
+        z = self._sampling_z(enc_mean, enc_var2)
+
+        dec_mean = self._decode_x_given_zy(z, y)
+
+        ll = self.bernoulli_log_likelihood(dec_mean, x_tilde)
+        kld = self.gaussian_kl_divergence(enc_mean, enc_var2)
+
+        logpy = self.py_log_likelihood(y)
+
+        elbo = ll + logpy - kld
+        if unlabeled_flg:
+            elbo = tf.transpose(tf.reshape(elbo, (self.n_classes, self.batch_size)))
+            elbo = pred * (elbo - tf.log(pred + 1e-12))
+
+        elbo = tf.reduce_sum(elbo) / self.batch_size
+
+        if not unlabeled_flg:
+            loss_y = self.categorical_log_likelihood(pred, y)
+            elbo += N * 0.1 * loss_y
+        return elbo
+
     def train(self, unlabeled_x, labeled_x, labeled_y, validation_x, validation_y):
         x_l_ph = tf.placeholder(tf.float32, shape=[None, self.image_size])
         x_u_ph = tf.placeholder(tf.float32, shape=[None, self.image_size])
         y_l_ph = tf.placeholder(tf.float32, shape=[None, self.n_classes])
 
-        x_u_ph2, y_u_ph = self.create_unlabeled_data(x_u_ph)
-        enc_mean_l, enc_var2_l = self._encode_z_given_xy(x_l_ph, y_l_ph)
-        enc_mean_u, enc_var2_u = self._encode_z_given_xy(x_u_ph2, y_u_ph)
-
-        # ### $y$の推論
-        pred_l = self._encode_y_given_x(x_l_ph)
-        pred_u = self._encode_y_given_x(x_u_ph)
-
-        # ## サンプリング
-        z_l = self._sampling_z(enc_mean_l, enc_var2_l)
-        z_u = self._sampling_z(enc_mean_u, enc_var2_u)
-
-
-        # ## 生成(復元) 
-        dec_mean_l = self._decode_x_given_zy(z_l, y_l_ph)
-        dec_mean_u = self._decode_x_given_zy(z_u, y_u_ph)
-        ll_l = self.bernoulli_log_likelihood(dec_mean_l, x_l_ph)
-        ll_u = self.bernoulli_log_likelihood(dec_mean_u, x_u_ph2)
-
-        kld_l = self.gaussian_kl_divergence(enc_mean_l, enc_var2_l)
-        kld_u = self.gaussian_kl_divergence(enc_mean_u, enc_var2_u)
-
-        logpy_l = self.py_log_likelihood(y_l_ph)
-        logpy_u = self.py_log_likelihood(y_u_ph)
-
-        # ### 目的関数
-
-        elbo_l = tf.reduce_sum(ll_l + logpy_l - kld_l) / self.batch_size
-
-        elbo_u_xy = tf.transpose(tf.reshape(ll_u + logpy_u - kld_u, (self.n_classes, self.batch_size)))
-        elbo_u = tf.reduce_sum(pred_u * (elbo_u_xy - tf.log(pred_u + 1e-12))) / self.batch_size
-
-        J = elbo_l + elbo_u
-
-        loss_y = self.categorical_log_likelihood(pred_l, y_l_ph)
-
         N = unlabeled_x.shape[0] + labeled_x.shape[0]
 
-        J_alpha = J + N * 0.1 * loss_y
+        elbo_l = self.reconstruct(x_l_ph, y_l_ph, N) 
 
-        optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=self.momentum)
-        gvs = optimizer.compute_gradients(-J_alpha)
-        capped_gvs = [(tf.clip_by_value(grad, -1., 5.), var) for grad, var in gvs]
-        train_step = optimizer.apply_gradients(capped_gvs)
+        elbo_u = self.reconstruct(x_u_ph)
+
+        J_alpha = elbo_l + elbo_u
+
+        train_step = self.set_optimizer(-J_alpha)
+
         self.init = tf.global_variables_initializer()
         self.sess.run(self.init)
-        #train_step = self.set_optimizer(-J_alpha)
 
         for i in range(self.nb_epoch):
             idx = np.random.permutation(range(unlabeled_x.shape[0]))
             elbo_ls = []
             elbo_us = []
-            loss_ys = []
             for j in range(unlabeled_x.shape[0] / self.batch_size):
                 unlabeled_batch_x = unlabeled_x[idx[j*self.batch_size: (j+1)*self.batch_size]]
-                _, e_l, e_u, l_y = self.sess.run([train_step, elbo_l, elbo_u, loss_y],
+                _, e_l, e_u  = self.sess.run([train_step, elbo_l, elbo_u],
                                feed_dict={x_l_ph: labeled_x,
                                           x_u_ph: unlabeled_batch_x,
                                           y_l_ph: labeled_y, 
@@ -222,10 +217,15 @@ class M2VAE(object):
                                          })
                 elbo_ls.append(e_l)
                 elbo_us.append(e_u)
-                loss_ys.append(l_y)
 
             acc = self.accuracy(validation_x, validation_y)
-            print ("Epoch: %d/%d, ELBO(labeled): %g, ELBO(unlabeled): %g, logp(y|x): %g, acc: %g" % 
-                    (i+1, self.nb_epoch, np.mean(elbo_ls), np.mean(elbo_us), np.mean(loss_ys), acc))
+            print ("Epoch: %d/%d, ELBO(labeled): %g, ELBO(unlabeled): %g, acc: %g" % 
+                    (i+1, self.nb_epoch, np.mean(elbo_ls), np.mean(elbo_us), acc))
 
 
+    def save(self, filepath):
+        self.saver = tf.train.Saver()
+        self.saver.save(self.sess, "model.ckpt")
+
+    def load(self, filepath):
+        pass
