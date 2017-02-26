@@ -1,7 +1,10 @@
 # coding: utf-8
 
-import gpu_config
-gpu_config.set_tensorflow([0])
+try:
+    import gpu_config
+    gpu_config.set_tensorflow([0])
+except ImportError:
+    print "no gpu"
 
 import numpy as np
 
@@ -24,6 +27,7 @@ class M2VAE(object):
         self.image_size = 784
         self.learning_rate = 0.00005
         self.momentum = 0.9
+        self.init_flg = False
 
         self.q = 'gaussian'
         self.p = 'bernoulli'
@@ -43,10 +47,10 @@ class M2VAE(object):
         # $ q_\phi (z| x, y)$ 
         self.encoder_z_given_xy = Sequential()
         self.encoder_z_given_xy.add(Dense(500, input_dim=self.image_size + self.n_classes))
-        self.encoder_z_given_xy.add(BatchNormalization())
+        #self.encoder_z_given_xy.add(BatchNormalization())
         self.encoder_z_given_xy.add(Activation('softplus'))
         self.encoder_z_given_xy.add(Dense(500))
-        self.encoder_z_given_xy.add(BatchNormalization())
+        #self.encoder_z_given_xy.add(BatchNormalization())
         self.encoder_z_given_xy.add(Activation('softplus'))
 
         self.encoder_z_given_xy_dense1 = Dense(self.z_dim)
@@ -56,10 +60,10 @@ class M2VAE(object):
         # $q_\phi (y|x)$
         self.encoder_y_given_x = Sequential()
         self.encoder_y_given_x.add(Dense(500, input_dim=self.image_size))
-        self.encoder_y_given_x.add(BatchNormalization())
+        #self.encoder_y_given_x.add(BatchNormalization())
         self.encoder_y_given_x.add(Activation('softplus'))
         self.encoder_y_given_x.add(Dense(500))
-        self.encoder_y_given_x.add(BatchNormalization())
+        #self.encoder_y_given_x.add(BatchNormalization())
         self.encoder_y_given_x.add(Activation('softplus'))
         self.encoder_y_given_x.add(Dense(self.n_classes, activation='softmax'))
 
@@ -67,10 +71,10 @@ class M2VAE(object):
         # $p_\theta (x | y, z)$
         self.decoder_x_given_yz = Sequential()
         self.decoder_x_given_yz.add(Dense(500, input_dim=self.z_dim + self.n_classes))
-        self.decoder_x_given_yz.add(BatchNormalization())
+        #self.decoder_x_given_yz.add(BatchNormalization())
         self.decoder_x_given_yz.add(Activation('softplus'))
         self.decoder_x_given_yz.add(Dense(500))
-        self.decoder_x_given_yz.add(BatchNormalization())
+        #self.decoder_x_given_yz.add(BatchNormalization())
         self.decoder_x_given_yz.add(Activation('softplus'))
         self.decoder_x_given_yz.add(Dense(self.image_size, activation='sigmoid'))
 
@@ -111,10 +115,17 @@ class M2VAE(object):
     def generate(self, label=None, random=True):
         z_ph = tf.placeholder(tf.float32, [None, self.z_dim])
         y_ph = tf.placeholder(tf.float32, [None, self.n_classes])
-        zy = tf.concat([z_ph, y_ph], axis=1)
-        x = self._decode_x_given_zy(zy)
-        z = None
-        y = None
+        self.initialize()
+        x = self._decode_x_given_zy(z_ph, y_ph)
+        if random:
+            z = np.random.normal(loc=0., scale=1., size=(100, self.z_dim))
+
+        y = []
+        for i in range(10):
+            for j in range(10):
+                a = [0] * 10
+                a[i] = 1
+                y.append(a)
         return self.sess.run(x, feed_dict={z_ph: z, y_ph: y, K.learning_phase(): 1})
 
     def accuracy(self, x, t):
@@ -185,6 +196,13 @@ class M2VAE(object):
             elbo += N * 0.1 * loss_y
         return elbo
 
+    def initialize(self):
+        if not self.init_flg:
+            self.init = tf.global_variables_initializer()
+            self.sess.run(self.init)
+        self.init_flg = True
+
+
     def train(self, unlabeled_x, labeled_x, labeled_y, validation_x, validation_y):
         x_l_ph = tf.placeholder(tf.float32, shape=[None, self.image_size])
         x_u_ph = tf.placeholder(tf.float32, shape=[None, self.image_size])
@@ -200,8 +218,8 @@ class M2VAE(object):
 
         train_step = self.set_optimizer(-J_alpha)
 
-        self.init = tf.global_variables_initializer()
-        self.sess.run(self.init)
+        self.initialize()
+
 
         for i in range(self.nb_epoch):
             idx = np.random.permutation(range(unlabeled_x.shape[0]))
@@ -223,9 +241,10 @@ class M2VAE(object):
                     (i+1, self.nb_epoch, np.mean(elbo_ls), np.mean(elbo_us), acc))
 
 
-    def save(self, filepath):
-        self.saver = tf.train.Saver()
-        self.saver.save(self.sess, "model.ckpt")
+    def save(self, filepath="model.ckpt"):
+        saver = tf.train.Saver()
+        saver.save(self.sess, filepath)
 
-    def load(self, filepath):
-        pass
+    def load(self, filepath="model.ckpt"):
+        saver = tf.train.Saver()
+        saver.restore(sess, filepath) 
