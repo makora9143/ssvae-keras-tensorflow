@@ -36,6 +36,7 @@ class M2VAE(object):
         K.set_session(self.sess)
 
         self.build_model()
+        self.initialize()
 
     def build_model(self):
         self.nn_q_z_given_xy()
@@ -61,10 +62,10 @@ class M2VAE(object):
         self.encoder_y_given_x = Sequential()
         self.encoder_y_given_x.add(Dense(500, input_dim=self.image_size))
         self.encoder_y_given_x.add(Activation('softplus'))
-        #self.encoder_y_given_x.add(BatchNormalization())
+        self.encoder_y_given_x.add(BatchNormalization())
         self.encoder_y_given_x.add(Dense(500))
         self.encoder_y_given_x.add(Activation('softplus'))
-        #self.encoder_y_given_x.add(BatchNormalization())
+        self.encoder_y_given_x.add(BatchNormalization())
         self.encoder_y_given_x.add(Dense(self.n_classes, activation='softmax'))
 
     def nn_p_x_given_yz(self):
@@ -83,12 +84,13 @@ class M2VAE(object):
         h_l = self.encoder_z_given_xy(xy_l)
         mean = self.encoder_z_given_xy_dense1(h_l)
         log_var2 = self.encoder_z_given_xy_dense2(h_l)
+        self.sess.run(tf.global_variables_initializer())
         return mean, log_var2
 
     def infer(self, x, y=None):
         x_ph = tf.placeholder(tf.float32, [None, self.image_size])
         y_ph = tf.placeholder(tf.float32, [None, self.n_classes])
-        z_op = self._encode_z_given_xy(x_ph, y_ph)
+        z_op, _ = self._encode_z_given_xy(x_ph, y_ph)
         if y is None:
             y = self.classify(x)
         return self.sess.run(z_op, feed_dict={x_ph: x, y_ph: y, K.learning_phase(): 1})
