@@ -47,11 +47,11 @@ class M2VAE(object):
         # $ q_\phi (z| x, y)$ 
         self.encoder_z_given_xy = Sequential()
         self.encoder_z_given_xy.add(Dense(500, input_dim=self.image_size + self.n_classes))
-        self.encoder_z_given_xy.add(BatchNormalization())
         self.encoder_z_given_xy.add(Activation('softplus'))
+        self.encoder_z_given_xy.add(BatchNormalization())
         self.encoder_z_given_xy.add(Dense(500))
-        self.encoder_z_given_xy.add(BatchNormalization())
         self.encoder_z_given_xy.add(Activation('softplus'))
+        self.encoder_z_given_xy.add(BatchNormalization())
 
         self.encoder_z_given_xy_dense1 = Dense(self.z_dim)
         self.encoder_z_given_xy_dense2 = Dense(self.z_dim)
@@ -60,22 +60,22 @@ class M2VAE(object):
         # $q_\phi (y|x)$
         self.encoder_y_given_x = Sequential()
         self.encoder_y_given_x.add(Dense(500, input_dim=self.image_size))
-        #self.encoder_y_given_x.add(BatchNormalization())
         self.encoder_y_given_x.add(Activation('softplus'))
+        #self.encoder_y_given_x.add(BatchNormalization())
         self.encoder_y_given_x.add(Dense(500))
-        #self.encoder_y_given_x.add(BatchNormalization())
         self.encoder_y_given_x.add(Activation('softplus'))
+        #self.encoder_y_given_x.add(BatchNormalization())
         self.encoder_y_given_x.add(Dense(self.n_classes, activation='softmax'))
 
     def nn_p_x_given_yz(self):
         # $p_\theta (x | y, z)$
         self.decoder_x_given_yz = Sequential()
         self.decoder_x_given_yz.add(Dense(500, input_dim=self.z_dim + self.n_classes))
-        self.decoder_x_given_yz.add(BatchNormalization())
         self.decoder_x_given_yz.add(Activation('softplus'))
+        self.decoder_x_given_yz.add(BatchNormalization())
         self.decoder_x_given_yz.add(Dense(500))
-        self.decoder_x_given_yz.add(BatchNormalization())
         self.decoder_x_given_yz.add(Activation('softplus'))
+        self.decoder_x_given_yz.add(BatchNormalization())
         self.decoder_x_given_yz.add(Dense(self.image_size, activation='sigmoid'))
 
     def _encode_z_given_xy(self, x_ph, y_ph):
@@ -112,7 +112,7 @@ class M2VAE(object):
             dec_mean = self.decoder_x_given_yz(zy)
             return dec_mean
 
-    def generate(self, y=None):
+    def generate(self, z=None, y=None):
         z_ph = tf.placeholder(tf.float32, [None, self.z_dim])
         y_ph = tf.placeholder(tf.float32, [None, self.n_classes])
         self.initialize()
@@ -124,9 +124,10 @@ class M2VAE(object):
                     a = [0] * 10
                     a[i] = 1
                     y.append(a)
-            z = np.random.normal(loc=0., scale=1., size=(100, self.z_dim))
+            num = 100
         else:
             num = y.shape[0]
+        if z is None:
             z = np.random.normal(loc=0., scale=1., size=(num, self.z_dim))
         return self.sess.run(x, feed_dict={z_ph: z, y_ph: y, K.learning_phase(): 1})
 
@@ -163,7 +164,7 @@ class M2VAE(object):
     def set_optimizer(self, loss_op):
         optimizer = tf.train.AdamOptimizer(self.learning_rate, beta1=self.momentum)
         gvs = optimizer.compute_gradients(loss_op)
-        capped_gvs = [(tf.clip_by_value(grad, -1., 5.), var) for grad, var in gvs]
+        capped_gvs = [(tf.clip_by_value(grad, -5., 5.), var) for grad, var in gvs]
         train_step = optimizer.apply_gradients(capped_gvs)
         return train_step
 
@@ -239,8 +240,7 @@ class M2VAE(object):
 
             acc = self.accuracy(validation_x, validation_y)
             print ("Epoch: %d/%d, ELBO(labeled): %g, ELBO(unlabeled): %g, acc: %g" % 
-                    (i+1, self.nb_epoch, np.mean(elbo_ls), np.mean(elbo_us), acc))
-
+                    (i+1, self.nb_epoch, np.mean(elbo_ls), np.mean(elbo_us), np.mean(acc)))
 
     def save(self, filepath="model.ckpt"):
         saver = tf.train.Saver()
@@ -383,7 +383,7 @@ class M1VAE(object):
 
             acc = self.accuracy(validation_x, validation_y)
             print ("Epoch: %d/%d, ELBO(labeled): %g" % 
-                    (i+1, self.nb_epoch, np.mean(elbo_ls))
+                    (i+1, self.nb_epoch, np.mean(elbo_ls)))
 
 
     def save(self, filepath="model.ckpt"):

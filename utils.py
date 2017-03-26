@@ -15,16 +15,20 @@ def create_semisupervised_data(dataset='mnist', label_nums=100):
         mnist = input_data.read_data_sets('MNIST_data/', one_hot=True)
         images = np.concatenate([mnist.train.images, mnist.validation.images, mnist.test.images])
         labels = np.concatenate([mnist.train.labels, mnist.validation.labels, mnist.test.labels])
-        train_x, test_x, train_y, test_y = train_test_split(images, labels, 
-                                                            test_size=2./7)
-        unlabeled_x, labeled_x, unlabeled_y, labeled_y = train_test_split(
-                                                            train_x, train_y, 
-                                                            test_size=float(label_nums)/50000)
-        validation_x, test_x, validation_y, test_y = train_test_split(
-                                                            test_x, test_y, 
-                                                            test_size=0.5)
-        unlabeled_size = train_x.shape[0] - label_nums
-        print collections.Counter(np.argmax(labeled_y, axis=1))
+        flg = True
+        while flg:
+            train_x, test_x, train_y, test_y = train_test_split(images, labels, 
+                                                                test_size=2./7)
+            unlabeled_x, labeled_x, unlabeled_y, labeled_y = train_test_split(
+                                                                train_x, train_y, 
+                                                                test_size=float(label_nums)/50000)
+            validation_x, test_x, validation_y, test_y = train_test_split(
+                                                                test_x, test_y, 
+                                                                test_size=0.5)
+            unlabeled_size = train_x.shape[0] - label_nums
+            print collections.Counter(np.argmax(labeled_y, axis=1))
+            if raw_input() == 'y':
+                flg = False
         return (unlabeled_x, labeled_x, labeled_y), (validation_x, validation_y), (test_x, test_y)
 
 

@@ -20,15 +20,18 @@ def reconstruct():
         print(request.headers['Content-Type'])
         return flask.jsonify(res='error'), 400
 
-    x = np.array(request.json)
+    x = np.array([request.json])
+    print x.shape
 
     model = vae.M2VAE()
+    model.load('/home/makora/notebooks/demo.ckpt')
 
-    y = model.predict(x)
-    z = model.inference(x, y)
-    result = [model.reconstruct(x, y)]
-    result += [model.generate(z, i) for i in range(10)]
+    #y = model.predict(x)
+    #z = model.inference(x, y)
+    #result = [model.reconstruct(x, y)]
+    #result += [model.generate(z, i) for i in range(10)]
 
+    result = []
     return flask.jsonify(result)
 
 
