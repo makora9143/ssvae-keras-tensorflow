@@ -87,7 +87,7 @@ class Main {
                 contentType: 'application/json',
                 data: JSON.stringify(inputs),
                 success: (data) => {
-                    draw_digit(this.recon, data[0]);
+                     draw_digit(this.recon, data[0]);
                     for(var i = 0; i < 10; i++) {
                         draw_digit(document.getElementById('digit_'+i), data[i+1]);
                     }
