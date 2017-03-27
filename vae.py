@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 
 class M2VAE(object):
     def __init__(self):
-        self.nb_epoch = 1000
+        self.nb_epoch = 100
         self.batch_size = 100
         self.z_dim = 50
         self.n_classes = 10
