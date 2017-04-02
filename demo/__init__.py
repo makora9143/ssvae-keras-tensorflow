@@ -6,14 +6,14 @@ from flask import request
 import flask
 import numpy as np
 
-import vae
+import cvae
 import tensorflow as tf
 
 from sklearn.preprocessing import binarize
 
 app = Flask(__name__, static_url_path='/static')
-model = vae.M2VAE()
-model.load('../demo.ckpt')
+model = cvae.VAE()
+model.load('./cvae.ckpt')
 
 @app.route('/')
 def hello():
@@ -25,29 +25,27 @@ def reconstruct():
         print(request.headers['Content-Type'])
         return flask.jsonify(res='error'), 400
 
-    print request.json
     x = (255. - np.array([request.json]).astype(np.float32)) / 255.
-    y = model.classify(x)
-    idx = np.argmax(y, axis=1)[0]
+    #print cnn.predict(x)
+    idx = 2
     y_ =[0] * 10
     y_[idx] = 1
-    print idx
-    y = np.array(y)
-    z, _ = model.infer(x)
-    x_ = binarize(model.generate(z, y), 0.2)
+    y = np.array([y_])
+    x_ = model.reconstruct(x, y)
+    z = model.infer(x, y)
     result = (255 - x_ * 255).astype(np.int32).tolist()
 
-    y_lable = []
+    y_label = []
     for i in range(10):
             a = [0] * 10
             a[i] = 1
-            y_lable.append(a)
-    result += hoge(np.tile(z, [10, 1]), np.array(y_lable))
+            y_label.append(a)
+    result += hoge(np.tile(z, [10, 1]), np.array(y_label))
 
     return flask.jsonify(result)
 
 def hoge(z, y):
-    x_ = binarize(model.generate(z, y), 0.2)
+    x_ = model.generate(z, y)
     return (255 - x_ * 255).astype(np.int32).tolist()
 
 

@@ -4,6 +4,11 @@ import tensorflow as tf
 from keras import backend as K
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Reshape
+from keras.layers import Convolution2D
+from keras.layers import MaxPooling2D
+from keras.layers import Dropout
+from keras.layers import Flatten
+from keras.metrics import categorical_crossentropy
 
 
 class VAE(object):
@@ -27,6 +32,18 @@ class VAE(object):
         self.p_net.add(Dense(500, activation='relu'))
         self.p_net.add(Dense(784, activation='sigmoid'))
 
+        # cnn
+        self.cnn = Sequential()
+        self.cnn.add(Reshape((28, 28, 1), input_shape=(784,)))
+        self.cnn.add(Convolution2D(32, 5, padding='same', activation='relu'))
+        self.cnn.add(MaxPooling2D())
+        self.cnn.add(Convolution2D(64, 5, padding='same', activation='relu'))
+        self.cnn.add(MaxPooling2D())
+        self.cnn.add(Flatten())
+        self.cnn.add(Dense(1024, activation='relu'))
+        self.cnn.add(Dropout(0.5))
+        self.cnn.add(Dense(10, activation='softmax'))
+
     def _encode(self, x_ph, y_ph):
         xy_ph = tf.concat([x_ph, y_ph], axis=-1)
         q_h = self.q_net(xy_ph)
@@ -41,6 +58,7 @@ class VAE(object):
         q_mean, q_log_var2 = self._encode(x_ph, y_ph)
         with tf.Session() as sess:
             sess = self.initialize(sess)
+            K.set_session(sess)
             result = sess.run(q_mean, feed_dict={x_ph: x, y_ph: y})
         return result
 
@@ -56,6 +74,7 @@ class VAE(object):
         p_mean = self._decode(z_ph, y_ph)
         with tf.Session() as sess:
             sess = self.initialize(sess)
+            K.set_session(sess)
             result = sess.run(p_mean, feed_dict={z_ph: z, y_ph: y})
         return result
 
@@ -77,6 +96,7 @@ class VAE(object):
 
         with tf.Session() as sess:
             sess = self.initialize(sess)
+            K.set_session(sess)
             result = sess.run(p_mean, feed_dict={x_ph: x, y_ph: y})
         return result
 
@@ -87,6 +107,15 @@ class VAE(object):
         else:
             sess.run(tf.global_variables_initializer())
         return sess
+
+    def predict(self, x):
+        x_ph = tf.placeholder(tf.float32, [None, 784])
+        pred = self.cnn(x_ph)
+
+        with tf.Session() as sess:
+            sess = self.initialize(sess)
+            result = sess.run(pred, feed_dict={x_ph: x, K.learning_phase(): 0})
+        return result
 
     def log_likelihood(self, x, recon_x):
         log_p_given_z = tf.reduce_sum(x * tf.log(recon_x + 1e-12) + \
@@ -114,20 +143,29 @@ class VAE(object):
         low_bound = tf.reduce_mean(log_p_given_z + D_KL)
         train_vae = tf.train.AdamOptimizer(0.01).minimize(-low_bound)
 
+        # cnn
+        pred = self.cnn(x_ph)
+        loss = tf.reduce_mean(categorical_crossentropy(y_ph, pred))
+        train_cnn = tf.train.AdamOptimizer(0.01).minimize(loss)
+
         self.trained_flg = save
         self.filepath = filepath
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
 
-            for i in range(5):
+            for i in range(1):
                 ave_loss = []
+                ave_cnn = []
                 for j in range(mnist.train.images.shape[0] / self.batch_size):
                     batch_xs, batch_ys = mnist.train.next_batch(self.batch_size)
-                    a = sess.run([train_vae, low_bound], feed_dict={x_ph: batch_xs, y_ph: batch_ys})
-                    ave_loss.append(a[1])
+                    _, vae_loss, _, cnn_loss = sess.run([train_vae, low_bound, train_cnn, loss],
+                            feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
+                    ave_loss.append(vae_loss)
+                    ave_cnn.append(cnn_loss)
                 result = np.mean(ave_loss)
-                print i+1, result
+                cnn_result = np.mean(ave_cnn)
+                print i+1, result, cnn_result
             if self.trained_flg:
                 saver = tf.train.Saver()
                 saver.save(sess, filepath)
@@ -136,5 +174,46 @@ class VAE(object):
         self.filepath = filepath
         self.trained_flg = True
 
+    def train_cnn(self, mnist):
+        self.model.fit(mnist.train.images, mnist.train.labels, epochs=1000, batch_size=32)
+        self.model.save_weights('cnn_weights.h5')
+
+    def load_cnn(self):
+        self.model.load_weights('cnn_weights.h5')
+
+    def predict(self, x):
+        return self.model.predict_classes(x)
 
 
+class CNN(object):
+    def __init__(self):
+        self.cnn = Sequential()
+        self.cnn.add(Reshape((28, 28, 1), input_shape=(784,)))
+        self.cnn.add(Convolution2D(32, 5, padding='same', activation='relu'))
+        self.cnn.add(MaxPooling2D())
+        self.cnn.add(Convolution2D(64, 5, padding='same', activation='relu'))
+        self.cnn.add(MaxPooling2D())
+        self.cnn.add(Flatten())
+        self.cnn.add(Dense(1024, activation='relu'))
+        self.cnn.add(Dropout(0.5))
+        self.cnn.add(Dense(10, activation='softmax'))
+        self.trained_flg = False
+       # self.model.compile(optimizer='adam', loss='categorical_crossentropy',
+       #         metrics=['accuracy'])
+
+    def predict(self, x):
+        x_ph = tf.placeholder(tf.float32, [None, 784])
+        pred = self.model(x_ph)
+
+        with tf.Session() as sess:
+            sess = self.initialize(sess)
+            result = sess.run(pred, feed_dict={x_ph: x, K.learning_phase(): 0})
+        return result
+
+    def initialize(self, sess):
+        if self.trained_flg:
+            saver = tf.train.Saver()
+            saver.restore(sess, self.filepath)
+        else:
+            sess.run(tf.global_variables_initializer())
+        return sess
