@@ -154,7 +154,7 @@ class VAE(object):
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
 
-            for i in range(1):
+            for i in range(3):
                 ave_loss = []
                 ave_cnn = []
                 for j in range(mnist.train.images.shape[0] / self.batch_size):
