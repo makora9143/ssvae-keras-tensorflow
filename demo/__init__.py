@@ -26,8 +26,8 @@ def reconstruct():
         return flask.jsonify(res='error'), 400
 
     x = (255. - np.array([request.json]).astype(np.float32)) / 255.
-    #print cnn.predict(x)
-    idx = 2
+    idx = np.argmax(model.predict(x))
+    print idx
     y_ =[0] * 10
     y_[idx] = 1
     y = np.array([y_])
@@ -42,7 +42,7 @@ def reconstruct():
             y_label.append(a)
     result += hoge(np.tile(z, [10, 1]), np.array(y_label))
 
-    return flask.jsonify(result)
+    return flask.jsonify({'pred':idx, 'result':result})
 
 def hoge(z, y):
     x_ = model.generate(z, y)
