@@ -25,6 +25,7 @@ def reconstruct():
         print(request.headers['Content-Type'])
         return flask.jsonify(res='error'), 400
 
+    print request.json
     x = (255. - np.array([request.json]).astype(np.float32)) / 255.
     y = model.classify(x)
     idx = np.argmax(y, axis=1)[0]

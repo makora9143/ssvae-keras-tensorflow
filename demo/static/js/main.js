@@ -66,33 +66,23 @@ class Main {
         var ctx = this.input.getContext('2d');
         var img = new Image();
         img.onload = () => {
-            var inputs = [];
-            var small = document.createElement('canvas').getContext('2d');
-            small.drawImage(img, 0, 0, img.width, img.height, 0, 0, 28, 28);
-            var data = small.getImageData(0, 0, 28, 28).data;
-            for (var i = 0; i < 28; i++) {
-                for (var j = 0; j < 28; j++) {
-                    var n = 4 * (i * 28 + j);
-                    inputs[i * 28 + j] = (data[n + 0] + data[n + 1] + data[n + 2]) / 3;
-                    ctx.fillStyle = 'rgb(' + [data[n + 0], data[n + 1], data[n + 2]].join(',') + ')';
-                    ctx.fillRect(j * 5, i * 5, 5, 5);
+            var small = document.createElement('canvas')
+            var small_ctx = small.getContext('2d');
+            small_ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, 28, 28);
+            document.getElementById('preview').src = small.toDataURL();
+            var inputs = small.toDataURL();
+        $.ajax({
+            url: '/api/recon',
+            method: 'POST',
+            contentType: 'application/json',
+            data: {img: inputs},
+            success: (data) => {
+                 draw_digit(this.recon, data[0]);
+                for(var i = 0; i < 10; i++) {
+                    draw_digit(document.getElementById('digit_'+i), data[i+1]);
                 }
             }
-            if (Math.min(...inputs) === 255) {
-                return;
-            }
-            $.ajax({
-                url: '/api/recon',
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify(inputs),
-                success: (data) => {
-                     draw_digit(this.recon, data[0]);
-                    for(var i = 0; i < 10; i++) {
-                        draw_digit(document.getElementById('digit_'+i), data[i+1]);
-                    }
-                }
-            });
+        });
         };
         img.src = this.canvas.toDataURL();
     }
@@ -112,5 +102,19 @@ $(() => {
     var main = new Main();
     $('#clear').click(() => {
         main.initialize();
+    });
+    $('#generate').click(() => {
+        $.ajax({
+            url: '/api/recon',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(inputs),
+            success: (data) => {
+                 draw_digit(this.recon, data[0]);
+                for(var i = 0; i < 10; i++) {
+                    draw_digit(document.getElementById('digit_'+i), data[i+1]);
+                }
+            }
+        });
     });
 });

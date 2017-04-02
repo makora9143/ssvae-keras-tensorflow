@@ -31,9 +31,10 @@ class M2VAE(object):
 
         self.q = 'gaussian'
         self.p = 'bernoulli'
+        self.saver = tf.train.Saver()
 
-        self.sess = tf.Session()
-        K.set_session(self.sess)
+        sess = tf.Session()
+        K.set_session(sess)
 
         self.build_model()
 
@@ -91,7 +92,11 @@ class M2VAE(object):
         z_op = self._encode_z_given_xy(x_ph, y_ph)
         if y is None:
             y = self.classify(x)
-        return self.sess.run(z_op, feed_dict={x_ph: x, y_ph: y, K.learning_phase(): 1})
+        with tf.Session() as sess:
+            if self.filepath:
+                self.saver.restore(sess, self.filepath)
+            result = sess.run(z_op, feed_dict={x_ph: x, y_ph: y, K.learning_phase(): 1})
+        return result
 
     def _encode_y_given_x(self, x_ph):
         return self.encoder_y_given_x(x_ph)
@@ -99,7 +104,11 @@ class M2VAE(object):
     def classify(self, x):
         x_ph = tf.placeholder(tf.float32, [None, self.image_size])
         y_op = self._encode_y_given_x(x_ph)
-        return self.sess.run(y_op, feed_dict={x_ph: x, K.learning_phase(): 1})
+        with tf.Session() as sess:
+            if self.filepath:
+                self.saver.restore(sess, self.filepath)
+            result =  self.sess.run(y_op, feed_dict={x_ph: x, K.learning_phase(): 1})
+        return result
 
     def _sampling_z(self, mean, log_var2):
         epsilon = tf.random_normal((tf.shape(mean)[0], self.z_dim), mean=0., stddev=1.)
@@ -129,14 +138,22 @@ class M2VAE(object):
             num = y.shape[0]
         if z is None:
             z = np.random.normal(loc=0., scale=1., size=(num, self.z_dim))
-        return self.sess.run(x, feed_dict={z_ph: z, y_ph: y, K.learning_phase(): 1})
+        with tf.Session() as sess:
+            if self.filepath:
+                self.saver.restore(sess, self.filepath)
+            result = sess.run(x, feed_dict={z_ph: z, y_ph: y, K.learning_phase(): 1})
+        return result
 
     def accuracy(self, x, t):
         x_ph = tf.placeholder(tf.float32, shape=[None, self.image_size])
         t_ph = tf.placeholder(tf.float32, shape=[None, self.n_classes])
         y_op = self._encode_y_given_x(x_ph)
         acc_value = categorical_accuracy(t_ph, y_op)
-        return self.sess.run(acc_value, feed_dict={x_ph: x, t_ph: t, K.learning_phase(): 1})
+        with tf.Session() as sess:
+            if self.filepath:
+                self.saver.restore(sess, self.filepath)
+            result = self.sess.run(acc_value, feed_dict={x_ph: x, t_ph: t, K.learning_phase(): 1})
+        return result
 
     def create_unlabeled_data(self, x):
         new_x = tf.tile(x, [self.n_classes, 1])
@@ -222,33 +239,35 @@ class M2VAE(object):
 
         self.initialize()
 
+        with tf.Session() as sess:
+            if self.filepath:
+                self.saver.restore(sess, self.filepath)
 
-        for i in range(self.nb_epoch):
-            idx = np.random.permutation(range(unlabeled_x.shape[0]))
-            elbo_ls = []
-            elbo_us = []
-            for j in range(unlabeled_x.shape[0] / self.batch_size):
-                unlabeled_batch_x = unlabeled_x[idx[j*self.batch_size: (j+1)*self.batch_size]]
-                _, e_l, e_u  = self.sess.run([train_step, elbo_l, elbo_u],
-                               feed_dict={x_l_ph: labeled_x,
-                                          x_u_ph: unlabeled_batch_x,
-                                          y_l_ph: labeled_y, 
-                                          K.learning_phase(): 1
-                                         })
-                elbo_ls.append(e_l)
-                elbo_us.append(e_u)
 
-            acc = self.accuracy(validation_x, validation_y)
-            print ("Epoch: %d/%d, ELBO(labeled): %g, ELBO(unlabeled): %g, acc: %g" % 
-                    (i+1, self.nb_epoch, np.mean(elbo_ls), np.mean(elbo_us), np.mean(acc)))
+            for i in range(self.nb_epoch):
+                idx = np.random.permutation(range(unlabeled_x.shape[0]))
+                elbo_ls = []
+                elbo_us = []
+                for j in range(unlabeled_x.shape[0] / self.batch_size):
+                    unlabeled_batch_x = unlabeled_x[idx[j*self.batch_size: (j+1)*self.batch_size]]
+                    _, e_l, e_u  = sess.run([train_step, elbo_l, elbo_u],
+                                   feed_dict={x_l_ph: labeled_x,
+                                              x_u_ph: unlabeled_batch_x,
+                                              y_l_ph: labeled_y, 
+                                              K.learning_phase(): 1
+                                             })
+                    elbo_ls.append(e_l)
+                    elbo_us.append(e_u)
+
+                acc = self.accuracy(validation_x, validation_y)
+                print ("Epoch: %d/%d, ELBO(labeled): %g, ELBO(unlabeled): %g, acc: %g" % 
+                        (i+1, self.nb_epoch, np.mean(elbo_ls), np.mean(elbo_us), np.mean(acc)))
 
     def save(self, filepath="model.ckpt"):
-        saver = tf.train.Saver()
-        saver.save(self.sess, filepath)
+        self.saver.save(self.sess, filepath)
 
     def load(self, filepath="./model.ckpt"):
-        saver = tf.train.Saver()
-        saver.restore(self.sess, filepath) 
+        self.filepath = filepath
 
 
 class M1VAE(object):
