@@ -80,6 +80,7 @@ class Main {
             }
             if (Math.min(...inputs) === 255) {
                 draw_digit(this.recon, data);
+                document.getElementById('answer').innerHTML = '';
                 for(var i = 0; i < 10; i++) {
                     draw_digit(document.getElementById('digit_'+i), data);
                 }
@@ -93,9 +94,10 @@ class Main {
             contentType: 'application/json',
             data: JSON.stringify(inputs),
             success: (data) => {
-                 draw_digit(this.recon, data[0]);
+                draw_digit(this.recon, data['result'][0]);
+                document.getElementById('answer').innerHTML = data['pred'];
                 for(var i = 0; i < 10; i++) {
-                    draw_digit(document.getElementById('digit_'+i), data[i+1]);
+                    draw_digit(document.getElementById('digit_'+i), data['result'][i+1]);
                 }
             }
         });

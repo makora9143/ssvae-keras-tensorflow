@@ -174,16 +174,6 @@ class VAE(object):
         self.filepath = filepath
         self.trained_flg = True
 
-    def train_cnn(self, mnist):
-        self.model.fit(mnist.train.images, mnist.train.labels, epochs=1000, batch_size=32)
-        self.model.save_weights('cnn_weights.h5')
-
-    def load_cnn(self):
-        self.model.load_weights('cnn_weights.h5')
-
-    def predict(self, x):
-        return self.model.predict_classes(x)
-
 
 class CNN(object):
     def __init__(self):
