@@ -15,6 +15,12 @@ app = Flask(__name__, static_url_path='/static')
 model = cvae.VAE()
 model.load('./cvae.ckpt')
 
+y_label = []
+for i in range(10):
+        a = [0] * 10
+        a[i] = 1
+        y_label.append(a)
+
 @app.route('/')
 def hello():
     return render_template('index.html')
@@ -27,7 +33,6 @@ def reconstruct():
 
     x = (255. - np.array([request.json]).astype(np.float32)) / 255.
     idx = np.argmax(model.predict(x))
-    print idx
     y_ =[0] * 10
     y_[idx] = 1
     y = np.array([y_])
@@ -35,11 +40,6 @@ def reconstruct():
     z = model.infer(x, y)
     result = (255 - x_ * 255).astype(np.int32).tolist()
 
-    y_label = []
-    for i in range(10):
-            a = [0] * 10
-            a[i] = 1
-            y_label.append(a)
     result += hoge(np.tile(z, [10, 1]), np.array(y_label))
 
     return flask.jsonify({'pred':idx, 'result':result})

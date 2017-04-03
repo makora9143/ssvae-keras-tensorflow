@@ -4,7 +4,7 @@ import tensorflow as tf
 from keras import backend as K
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Reshape
-from keras.layers import Convolution2D
+from keras.layers import Convolution2D, Deconvolution2D
 from keras.layers import MaxPooling2D
 from keras.layers import Dropout
 from keras.layers import Flatten
@@ -21,17 +21,24 @@ class VAE(object):
 
         # encode
         self.q_net = Sequential()
-        self.q_net.add(Dense(500, activation='relu', input_dim=794))
-        self.q_net.add(Dense(500, activation='relu'))
+        self.q_net.add(Reshape((28, 28, 1), input_shape=(784,)))
+        self.q_net.add(Convolution2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Convolution2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Flatten())
+        self.q_net.add(Dense(1024, activation='relu'))
 
-        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=500)])
-        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=500)])
+        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024)])
+        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024)])
 
         # decode
         self.p_net = Sequential()
-        self.p_net.add(Dense(500, activation='relu', input_dim=self.z_dim+10))
-        self.p_net.add(Dense(500, activation='relu'))
-        self.p_net.add(Dense(784, activation='sigmoid'))
+        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+10))
+        self.p_net.add(Dense(7*7*64, activation='relu'))
+        self.p_net.add(Reshape((7, 7, 64)))
+
+        self.p_net.add(Deconvolution2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.p_net.add(Deconvolution2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid'))
+        self.p_net.add(Flatten())
 
         # cnn
         self.cnn = Sequential()
