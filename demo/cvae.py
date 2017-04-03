@@ -14,7 +14,7 @@ from keras.metrics import categorical_crossentropy
 class VAE(object):
     def __init__(self):
         self.batch_size = 32
-        self.z_dim = 2
+        self.z_dim = 10
 
         self.trained_flg = False
 
@@ -102,8 +102,9 @@ class VAE(object):
 
     def initialize(self, sess):
         if self.trained_flg:
-            saver = tf.train.Saver()
-            saver.restore(sess, self.filepath)
+            #saver = tf.train.Saver()
+            #saver.restore(sess, self.filepath)
+            return self.sess
         else:
             sess.run(tf.global_variables_initializer())
         return sess
@@ -176,37 +177,6 @@ class VAE(object):
     def load(self, filepath):
         self.filepath = filepath
         self.trained_flg = True
-
-
-class CNN(object):
-    def __init__(self):
-        self.cnn = Sequential()
-        self.cnn.add(Reshape((28, 28, 1), input_shape=(784,)))
-        self.cnn.add(Convolution2D(32, 5, padding='same', activation='relu'))
-        self.cnn.add(MaxPooling2D())
-        self.cnn.add(Convolution2D(64, 5, padding='same', activation='relu'))
-        self.cnn.add(MaxPooling2D())
-        self.cnn.add(Flatten())
-        self.cnn.add(Dense(1024, activation='relu'))
-        self.cnn.add(Dropout(0.5))
-        self.cnn.add(Dense(10, activation='softmax'))
-        self.trained_flg = False
-       # self.model.compile(optimizer='adam', loss='categorical_crossentropy',
-       #         metrics=['accuracy'])
-
-    def predict(self, x):
-        x_ph = tf.placeholder(tf.float32, [None, 784])
-        pred = self.model(x_ph)
-
-        with tf.Session() as sess:
-            sess = self.initialize(sess)
-            result = sess.run(pred, feed_dict={x_ph: x, K.learning_phase(): 0})
-        return result
-
-    def initialize(self, sess):
-        if self.trained_flg:
-            saver = tf.train.Saver()
-            saver.restore(sess, self.filepath)
-        else:
-            sess.run(tf.global_variables_initializer())
-        return sess
+        self.sess = tf.Session()
+        saver = tf.train.Saver()
+        saver.restore(self.sess, filepath)
