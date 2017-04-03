@@ -15,6 +15,7 @@ class VAE(object):
     def __init__(self):
         self.batch_size = 32
         self.z_dim = 10
+        self.epochs = 1000
 
         self.trained_flg = False
 
@@ -157,7 +158,7 @@ class VAE(object):
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
 
-            for i in range(200):
+            for i in range(self.epochs):
                 ave_loss = []
                 ave_cnn = []
                 for j in range(mnist.train.images.shape[0] / self.batch_size):
