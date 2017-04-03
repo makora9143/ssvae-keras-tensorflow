@@ -13,7 +13,7 @@ from keras.metrics import categorical_crossentropy
 
 class VAE(object):
     def __init__(self):
-        self.batch_size = 100
+        self.batch_size = 32
         self.z_dim = 2
 
         self.trained_flg = False
@@ -141,12 +141,14 @@ class VAE(object):
         D_KL = self.kl_divergence(q_mean, q_log_var2)
 
         low_bound = tf.reduce_mean(log_p_given_z + D_KL)
-        train_vae = tf.train.AdamOptimizer(0.01).minimize(-low_bound)
+        train_vae = tf.train.AdamOptimizer(0.0003).minimize(-low_bound)
 
         # cnn
         pred = self.cnn(x_ph)
         loss = tf.reduce_mean(categorical_crossentropy(y_ph, pred))
-        train_cnn = tf.train.AdamOptimizer(0.01).minimize(loss)
+        train_cnn = tf.train.AdamOptimizer(1e-4).minimize(loss)
+        correct_prediction = tf.equal(tf.argmax(pred,1), tf.argmax(y_ph,1))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
         self.trained_flg = save
         self.filepath = filepath
@@ -154,7 +156,7 @@ class VAE(object):
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
 
-            for i in range(3):
+            for i in range(200):
                 ave_loss = []
                 ave_cnn = []
                 for j in range(mnist.train.images.shape[0] / self.batch_size):
@@ -166,6 +168,7 @@ class VAE(object):
                 result = np.mean(ave_loss)
                 cnn_result = np.mean(ave_cnn)
                 print i+1, result, cnn_result
+                print("test accuracy %g" % sess.run(accuracy, feed_dict={x_ph: mnist.test.images, y_ph: mnist.test.labels, K.learning_phase(): 0}))
             if self.trained_flg:
                 saver = tf.train.Saver()
                 saver.save(sess, filepath)
