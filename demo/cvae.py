@@ -173,6 +173,16 @@ class VAE(object):
         D_KL = self.kl_divergence(q_mean, q_log_var2)
 
         low_bound = tf.reduce_mean(log_p_given_z + D_KL)
+        #train_vae = tf.train.AdamOptimizer(0.0003).minimize(-low_bound)
+
+        optimizer = tf.train.AdamOptimizer(0.0003)
+        gvs = optimizer.compute_gradients(-low_bound)
+        def ClipIfNotNone(grad):
+            if grad is None:
+                return grad
+            return tf.clip_by_value(grad, -5, 5)
+        capped_gvs = [(ClipIfNotNone(grad), var) for grad, var in gvs]
+        train_vae = optimizer.apply_gradients(capped_gvs)
 
         # cnn
         pred = self.cnn(x_ph)
@@ -181,14 +191,21 @@ class VAE(object):
         correct_prediction = tf.equal(tf.argmax(pred,1), tf.argmax(y_ph,1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-
         # gan
         d_loss = tf.reduce_mean(tf.log(self._discriminate(x_ph, y_ph)) + tf.log(1 - self._discriminate(p_mean, y_ph)))
         g_loss = tf.reduce_mean(tf.log(1 - self._discriminate(p_mean, y_ph)))
 
-        train_dis = tf.train.AdamOptimizer(0.0003).minimize(-d_loss, var_list=self.discriminator1.trainable_weights + self.discriminator2.trainable_weights)
-        train_vae = tf.train.AdamOptimizer(0.0003).minimize(-low_bound + g_loss,
-                var_list=self.q_net.trainable_weights+self.q_net_mean.trainable_weights+self.q_net_log_var2.trainable_weights+self.p_net.trainable_weights)
+        #train_dis = tf.train.AdamOptimizer(0.0003).minimize(-d_loss, 
+        #        var_list=self.discriminator1.trainable_weights + self.discriminator2.trainable_weights)
+        gvs_dis = optimizer.compute_gradients(-d_loss, var_list=self.discriminator1.trainable_weights + self.discriminator2.trainable_weights)
+        capped_gvs_dis = [(ClipIfNotNone(grad), var) for grad, var in gvs_dis]
+        train_dis = optimizer.apply_gradients(capped_gvs_dis)
+
+        #train_gen = tf.train.AdamOptimizer(0.0003).minimize(g_loss, 
+        #        var_list=self.p_net.trainable_weights)
+        gvs_gen = optimizer.compute_gradients(g_loss, var_list=self.p_net.trainable_weights)
+        capped_gvs_gen = [(ClipIfNotNone(grad), var) for grad, var in gvs_gen]
+        train_gen = optimizer.apply_gradients(capped_gvs_gen)
 
         self.trained_flg = save
         self.filepath = filepath
@@ -201,9 +218,10 @@ class VAE(object):
                 ave_cnn = []
                 for j in range(mnist.train.images.shape[0] / self.batch_size):
                     batch_xs, batch_ys = mnist.train.next_batch(self.batch_size)
-                    sess.run(train_dis, feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
                     _, vae_loss, _, cnn_loss = sess.run([train_vae, low_bound, train_cnn, loss],
                             feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
+                    sess.run(train_dis, feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
+                    sess.run(train_gen, feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
                     ave_loss.append(vae_loss)
                     ave_cnn.append(cnn_loss)
                 result = np.mean(ave_loss)
