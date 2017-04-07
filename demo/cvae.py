@@ -14,8 +14,8 @@ from keras.metrics import categorical_crossentropy
 class VAE(object):
     def __init__(self):
         self.batch_size = 32
-        self.z_dim = 10
-        self.epochs = 1000
+        self.z_dim = 15
+        self.epochs = 300
 
         self.trained_flg = False
 
@@ -27,8 +27,8 @@ class VAE(object):
         self.q_net.add(Flatten())
         self.q_net.add(Dense(1024, activation='relu'))
 
-        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024)])
-        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024)])
+        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+10)])
+        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+10)])
 
         # decode
         self.p_net = Sequential()
@@ -36,7 +36,7 @@ class VAE(object):
         self.p_net.add(Dense(7*7*64, activation='relu'))
         self.p_net.add(Reshape((7, 7, 64)))
 
-        self.p_net.add(Deconvolution2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.p_net.add(Deconvolution2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
         self.p_net.add(Deconvolution2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid'))
         self.p_net.add(Flatten())
 
@@ -53,10 +53,10 @@ class VAE(object):
         self.cnn.add(Dense(10, activation='softmax'))
 
     def _encode(self, x_ph, y_ph):
-        xy_ph = tf.concat([x_ph, y_ph], axis=-1)
-        q_h = self.q_net(xy_ph)
-        q_mean = self.q_net_mean(q_h)
-        q_log_var2 = self.q_net_log_var2(q_h)
+        q_h = self.q_net(x_ph)
+        xy_ph = tf.concat([q_h, y_ph], axis=-1)
+        q_mean = self.q_net_mean(xy_ph)
+        q_log_var2 = self.q_net_log_var2(xy_ph)
         return q_mean, q_log_var2
 
     def infer(self, x, y):
