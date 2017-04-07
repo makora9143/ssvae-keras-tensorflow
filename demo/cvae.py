@@ -16,7 +16,7 @@ class VAE(object):
     def __init__(self):
         self.batch_size = 32
         self.z_dim = 15
-        self.epochs = 300
+        self.epochs = 100
 
         self.trained_flg = False
 
@@ -216,17 +216,21 @@ class VAE(object):
             for i in range(self.epochs):
                 ave_loss = []
                 ave_cnn = []
+                ave_dis = []
+                ave_gen = []
                 for j in range(mnist.train.images.shape[0] / self.batch_size):
                     batch_xs, batch_ys = mnist.train.next_batch(self.batch_size)
                     _, vae_loss, _, cnn_loss = sess.run([train_vae, low_bound, train_cnn, loss],
                             feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
-                    sess.run(train_dis, feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
-                    sess.run(train_gen, feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
+                    _, dis_loss = sess.run([train_dis, d_loss], feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
+                    _, gen_loss = sess.run([train_gen, g_loss], feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
                     ave_loss.append(vae_loss)
                     ave_cnn.append(cnn_loss)
+                    ave_dis.append(dis_loss)
+                    ave_gen.append(gen_loss)
                 result = np.mean(ave_loss)
                 cnn_result = np.mean(ave_cnn)
-                print i+1, result, cnn_result
+                print i+1, result, cnn_result, np.mean(ave_dis), np.mean(ave_gen)
                 print("test accuracy %g" % sess.run(accuracy, feed_dict={x_ph: mnist.test.images, y_ph: mnist.test.labels, K.learning_phase(): 0}))
             if self.trained_flg:
                 saver = tf.train.Saver()
