@@ -22,35 +22,45 @@ class VAE(object):
         # encode
         self.q_net = Sequential()
         self.q_net.add(Reshape((28, 28, 1), input_shape=(784,)))
+        self.q_net.add(Convolution2D(32, 3, padding='same', activation='relu'))
         self.q_net.add(Convolution2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Convolution2D(64, 3, padding='same', activation='relu'))
         self.q_net.add(Convolution2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
         self.q_net.add(Flatten())
-        self.q_net.add(Dense(1024, activation='relu'))
+        self.q_net.add(Dense(256, activation='relu'))
 
-        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+10)])
-        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+10)])
+        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=256+72)])
+        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=256+72)])
 
         # decode
         self.p_net = Sequential()
-        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+10))
+        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+72))
         self.p_net.add(Dense(7*7*64, activation='relu'))
         self.p_net.add(Reshape((7, 7, 64)))
 
-        self.p_net.add(Deconvolution2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.p_net.add(Convolution2D(64, 3, padding='same', activation='relu'))
+        self.p_net.add(Deconvolution2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.p_net.add(Convolution2D(32, 3, padding='same', activation='relu'))
         self.p_net.add(Deconvolution2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid'))
         self.p_net.add(Flatten())
 
         # cnn
         self.cnn = Sequential()
         self.cnn.add(Reshape((28, 28, 1), input_shape=(784,)))
-        self.cnn.add(Convolution2D(32, 5, padding='same', activation='relu'))
+        self.cnn.add(Convolution2D(32, 3, padding='same', activation='relu'))
+        self.cnn.add(Convolution2D(32, 3, padding='same', activation='relu'))
         self.cnn.add(MaxPooling2D())
-        self.cnn.add(Convolution2D(64, 5, padding='same', activation='relu'))
-        self.cnn.add(MaxPooling2D())
-        self.cnn.add(Flatten())
-        self.cnn.add(Dense(1024, activation='relu'))
         self.cnn.add(Dropout(0.5))
-        self.cnn.add(Dense(10, activation='softmax'))
+
+        self.cnn.add(Convolution2D(64, 3, padding='same', activation='relu'))
+        self.cnn.add(Convolution2D(64, 3, padding='same', activation='relu'))
+        self.cnn.add(MaxPooling2D())
+        self.cnn.add(Dropout(0.5))
+
+        self.cnn.add(Flatten())
+        self.cnn.add(Dense(256, activation='relu'))
+        self.cnn.add(Dropout(0.5))
+        self.cnn.add(Dense(72, activation='softmax'))
 
     def _encode(self, x_ph, y_ph):
         q_h = self.q_net(x_ph)
@@ -61,7 +71,7 @@ class VAE(object):
 
     def infer(self, x, y):
         x_ph = tf.placeholder(tf.float32, [None, 784])
-        y_ph = tf.placeholder(tf.float32, [None, 10])
+        y_ph = tf.placeholder(tf.float32, [None, 72])
 
         q_mean, q_log_var2 = self._encode(x_ph, y_ph)
         with tf.Session() as sess:
@@ -77,7 +87,7 @@ class VAE(object):
 
     def generate(self, z, y):
         z_ph = tf.placeholder(tf.float32, [None, self.z_dim])
-        y_ph = tf.placeholder(tf.float32, [None, 10])
+        y_ph = tf.placeholder(tf.float32, [None, 72])
 
         p_mean = self._decode(z_ph, y_ph)
         with tf.Session() as sess:
@@ -98,7 +108,7 @@ class VAE(object):
 
     def reconstruct(self, x, y):
         x_ph = tf.placeholder(tf.float32, [None, 784])
-        y_ph = tf.placeholder(tf.float32, [None, 10])
+        y_ph = tf.placeholder(tf.float32, [None, 72])
 
         p_mean = self._reconstruct(x_ph, y_ph)
 
@@ -137,7 +147,7 @@ class VAE(object):
 
     def train(self, mnist, save=False, filepath='./cvae.ckpt'):
         x_ph = tf.placeholder(tf.float32, [None, 784])
-        y_ph = tf.placeholder(tf.float32, [None, 10])
+        y_ph = tf.placeholder(tf.float32, [None, 72])
 
         q_mean, q_log_var2 = self._encode(x_ph, y_ph)
 
