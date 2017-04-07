@@ -6,6 +6,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation, Reshape
 from keras.layers import Convolution2D, Deconvolution2D
 from keras.layers import MaxPooling2D
+from keras.layers import BatchNormalization
 from keras.layers import Dropout
 from keras.layers import Flatten
 from keras.metrics import categorical_crossentropy
@@ -51,6 +52,21 @@ class VAE(object):
         self.cnn.add(Dense(1024, activation='relu'))
         self.cnn.add(Dropout(0.5))
         self.cnn.add(Dense(10, activation='softmax'))
+
+        self.discriminator1 = Sequential()
+        self.discriminator1.add(Reshape((28, 28, 1), input_shape=(784,)))
+        self.discriminator1.add(Convolution2D(32, 5, strides=(2, 2), padding='same'))
+        self.discriminator1.add(BatchNormalization())
+        self.discriminator1.add(Activation('relu'))
+        self.discriminator1.add(Convolution2D(64, 5, strides=(2, 2), padding='same'))
+        self.discriminator1.add(BatchNormalization())
+        self.discriminator1.add(Activation('relu'))
+        self.discriminator1.add(Flatten())
+        self.discriminator1.add(Dense(1024, activation='relu' ))
+
+        self.discriminator2 = Sequential()
+        self.discriminator2.add(Dense(1, input_dim=1024+10))
+        self.discriminator2.add(Activation('sigmoid'))
 
     def _encode(self, x_ph, y_ph):
         q_h = self.q_net(x_ph)
@@ -108,6 +124,13 @@ class VAE(object):
             result = sess.run(p_mean, feed_dict={x_ph: x, y_ph: y})
         return result
 
+    def _discriminate(self, x_ph, y_ph):
+        judge1 = self.discriminator1(x_ph)
+        judge_y = tf.concat([judge1, y_ph], axis=-1)
+
+        result = self.discriminator2(judge_y)
+        return result
+
     def initialize(self, sess):
         if self.trained_flg:
             #saver = tf.train.Saver()
@@ -150,7 +173,6 @@ class VAE(object):
         D_KL = self.kl_divergence(q_mean, q_log_var2)
 
         low_bound = tf.reduce_mean(log_p_given_z + D_KL)
-        train_vae = tf.train.AdamOptimizer(0.0003).minimize(-low_bound)
 
         # cnn
         pred = self.cnn(x_ph)
@@ -158,6 +180,15 @@ class VAE(object):
         train_cnn = tf.train.AdamOptimizer(1e-4).minimize(loss)
         correct_prediction = tf.equal(tf.argmax(pred,1), tf.argmax(y_ph,1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+
+        # gan
+        d_loss = tf.reduce_mean(tf.log(self._discriminate(x_ph, y_ph)) + tf.log(1 - self._discriminate(p_mean, y_ph)))
+        g_loss = tf.reduce_mean(tf.log(1 - self._discriminate(p_mean, y_ph)))
+
+        train_dis = tf.train.AdamOptimizer(0.0003).minimize(-d_loss, var_list=self.discriminator1.trainable_weights + self.discriminator2.trainable_weights)
+        train_vae = tf.train.AdamOptimizer(0.0003).minimize(-low_bound + g_loss,
+                var_list=self.q_net.trainable_weights+self.q_net_mean.trainable_weights+self.q_net_log_var2.trainable_weights+self.p_net.trainable_weights)
 
         self.trained_flg = save
         self.filepath = filepath
@@ -170,6 +201,7 @@ class VAE(object):
                 ave_cnn = []
                 for j in range(mnist.train.images.shape[0] / self.batch_size):
                     batch_xs, batch_ys = mnist.train.next_batch(self.batch_size)
+                    sess.run(train_dis, feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
                     _, vae_loss, _, cnn_loss = sess.run([train_vae, low_bound, train_cnn, loss],
                             feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
                     ave_loss.append(vae_loss)
