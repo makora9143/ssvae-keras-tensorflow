@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 
 nb_classes = 72
 # input image dimensions
-img_rows, img_cols = 28, 28
+img_rows, img_cols = 32, 32
 # img_rows, img_cols = 127, 128
 
 ary = np.load("hiragana.npz")['arr_0'].reshape([-1, 127, 128]).astype(np.float32) / 15
@@ -18,8 +18,8 @@ Y_train = np.repeat(np.arange(nb_classes), 160)
 
 X_train, X_test, Y_train, Y_test = train_test_split(X_train, Y_train, test_size=0.2)
 
-X_train = X_train.reshape(X_train.shape[0], 784)
-X_test = X_test.reshape(X_test.shape[0], 784)
+X_train = X_train.reshape(X_train.shape[0], 32*32)
+X_test = X_test.reshape(X_test.shape[0], 32*32)
 input_shape = (img_rows, img_cols, 1)
 
 # convert class vectors to binary class matrices

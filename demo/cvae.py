@@ -4,7 +4,7 @@ import tensorflow as tf
 from keras import backend as K
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Reshape
-from keras.layers import Convolution2D, Deconvolution2D
+from keras.layers import Conv2D, Deconv2D
 from keras.layers import MaxPooling2D
 from keras.layers import Dropout
 from keras.layers import Flatten
@@ -15,34 +15,39 @@ from keras.metrics import categorical_crossentropy
 class VAE(object):
     def __init__(self):
         self.batch_size = 16
-        self.z_dim = 15
+        self.z_dim = 50
         self.epochs = 300
 
         self.trained_flg = False
 
         # encode
         self.q_net = Sequential()
-        self.q_net.add(Reshape((28, 28, 1), input_shape=(784,)))
-        self.q_net.add(Convolution2D(32, 3, padding='same', activation='relu'))
-        self.q_net.add(Convolution2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.q_net.add(Convolution2D(64, 3, padding='same', activation='relu'))
-        self.q_net.add(Convolution2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Reshape((32, 32, 1), input_shape=(32*32,)))
+        self.q_net.add(Conv2D(32, 3, padding='same', activation='relu'))
+        self.q_net.add(Conv2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Conv2D(64, 3, padding='same', activation='relu'))
+        self.q_net.add(Conv2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Conv2D(128, 3, padding='same', activation='relu'))
+        self.q_net.add(Conv2D(128, 5, strides=(2, 2), padding='same', activation='relu'))
         self.q_net.add(Flatten())
-        self.q_net.add(Dense(256, activation='relu'))
+        self.q_net.add(Dense(1024, activation='relu'))
+        self.q_net.summary()
 
-        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=256+72)])
-        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=256+72)])
+        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+72)])
+        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+72)])
 
         # decode
         self.p_net = Sequential()
         self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+72))
-        self.p_net.add(Dense(7*7*64, activation='relu'))
-        self.p_net.add(Reshape((7, 7, 64)))
+        self.p_net.add(Dense(4*4*128, activation='relu'))
+        self.p_net.add(Reshape((4, 4, 128)))
 
-        self.p_net.add(Convolution2D(64, 3, padding='same', activation='relu'))
-        self.p_net.add(Deconvolution2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.p_net.add(Convolution2D(32, 3, padding='same', activation='relu'))
-        self.p_net.add(Deconvolution2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid'))
+        self.p_net.add(Conv2D(128, 3, padding='same', activation='relu'))
+        self.p_net.add(Deconv2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.p_net.add(Conv2D(64, 3, padding='same', activation='relu'))
+        self.p_net.add(Deconv2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.p_net.add(Conv2D(32, 3, padding='same', activation='relu'))
+        self.p_net.add(Deconv2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid'))
         self.p_net.add(Flatten())
 
         def my_init(shape, name=None):
@@ -50,14 +55,16 @@ class VAE(object):
 
         # cnn
         self.cnn = Sequential()
-        self.cnn.add(Reshape((28, 28, 1), input_shape=(784,)))
-        self.cnn.add(Convolution2D(32, 3, init=my_init, padding='same', activation='relu'))
-        self.cnn.add(Convolution2D(32, 3, padding='same', activation='relu'))
+        self.cnn.add(Reshape((32, 32, 1), input_shape=(32*32,)))
+        self.cnn.add(Conv2D(32, 3, init=my_init, padding='same', activation='relu'))
+        self.cnn.add(Conv2D(32, 3, padding='same', activation='relu'))
         self.cnn.add(MaxPooling2D())
+        self.cnn.add(Dropout(0.5))
 
-        self.cnn.add(Convolution2D(64, 3, padding='same', activation='relu'))
-        self.cnn.add(Convolution2D(64, 3, padding='same', activation='relu'))
+        self.cnn.add(Conv2D(64, 3, padding='same', activation='relu'))
+        self.cnn.add(Conv2D(64, 3, padding='same', activation='relu'))
         self.cnn.add(MaxPooling2D())
+        self.cnn.add(Dropout(0.5))
 
         self.cnn.add(Flatten())
         self.cnn.add(Dense(1024, activation='relu'))
@@ -72,7 +79,7 @@ class VAE(object):
         return q_mean, q_log_var2
 
     def infer(self, x, y):
-        x_ph = tf.placeholder(tf.float32, [None, 784])
+        x_ph = tf.placeholder(tf.float32, [None, 32*32])
         y_ph = tf.placeholder(tf.float32, [None, 72])
 
         q_mean, q_log_var2 = self._encode(x_ph, y_ph)
@@ -109,7 +116,7 @@ class VAE(object):
         return p_mean
 
     def reconstruct(self, x, y):
-        x_ph = tf.placeholder(tf.float32, [None, 784])
+        x_ph = tf.placeholder(tf.float32, [None, 32*32])
         y_ph = tf.placeholder(tf.float32, [None, 72])
 
         p_mean = self._reconstruct(x_ph, y_ph)
@@ -130,7 +137,7 @@ class VAE(object):
         return sess
 
     def predict(self, x):
-        x_ph = tf.placeholder(tf.float32, [None, 784])
+        x_ph = tf.placeholder(tf.float32, [None, 32*32])
         pred = self.cnn(x_ph)
 
         with tf.Session() as sess:
@@ -148,7 +155,7 @@ class VAE(object):
         return D_KL
 
     def train(self, X_train, y_train, X_test, y_test, save=False, filepath='./cvae.ckpt'):
-        x_ph = tf.placeholder(tf.float32, [None, 784])
+        x_ph = tf.placeholder(tf.float32, [None, 32*32])
         y_ph = tf.placeholder(tf.float32, [None, 72])
 
         q_mean, q_log_var2 = self._encode(x_ph, y_ph)
