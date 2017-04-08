@@ -23,12 +23,12 @@
                 </div>
                 <div class="col-md-6">
                     <p>input:</p>
-                    <canvas id="input" style="border:1px solid" width="140" height="140"></canvas>
+                    <canvas id="input" style="border:1px solid" width="160" height="160"></canvas>
                     <img id='preview' src=""></img>
                     <hr>
                     <p>predict:<span id="answer"></span></p>
                     <p>reconstruct:</p>
-                    <canvas id="reconstruct" style="border:1px solid" width="140" height="140"></canvas>
+                    <canvas id="reconstruct" style="border:1px solid" width="160" height="160"></canvas>
                     <hr>
                 </div>
             </div>
@@ -37,7 +37,7 @@
                     <hr>
                     <p>generate:</p>
                     {% for i in range(72) %}
-                    <canvas id="digit_{{i}}" style="border:1px solid" width="140" height="140"></canvas>
+                    <canvas id="digit_{{i}}" style="border:1px solid" width="160" height="160"></canvas>
                     {% if i % 5 == 0 and i != 0%}
                     <br>
                     {% endif %}
