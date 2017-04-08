@@ -16,7 +16,7 @@ class VAE(object):
     def __init__(self):
         self.batch_size = 32
         self.z_dim = 15
-        self.epochs = 100
+        self.epochs = 300
 
         self.trained_flg = False
 
@@ -37,7 +37,7 @@ class VAE(object):
         self.p_net.add(Dense(7*7*64, activation='relu'))
         self.p_net.add(Reshape((7, 7, 64)))
 
-        self.p_net.add(Deconvolution2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.p_net.add(Deconvolution2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
         self.p_net.add(Deconvolution2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid'))
         self.p_net.add(Flatten())
 
@@ -222,8 +222,10 @@ class VAE(object):
                     batch_xs, batch_ys = mnist.train.next_batch(self.batch_size)
                     _, vae_loss, _, cnn_loss = sess.run([train_vae, low_bound, train_cnn, loss],
                             feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
-                    _, dis_loss = sess.run([train_dis, d_loss], feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
-                    _, gen_loss = sess.run([train_gen, g_loss], feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
+                    z_value = np.random.normal(loc=0., scale=1., size=(self.batch_size, self.z_dim))
+                    _, dis_loss = sess.run([train_dis, d_loss], feed_dict={x_ph: batch_xs, z: z_value, y_ph: batch_ys, K.learning_phase(): 1})
+                    z_value = np.random.normal(loc=0., scale=1., size=(self.batch_size, self.z_dim))
+                    _, gen_loss = sess.run([train_gen, g_loss], feed_dict={z: z_value, y_ph: batch_ys, K.learning_phase(): 1})
                     ave_loss.append(vae_loss)
                     ave_cnn.append(cnn_loss)
                     ave_dis.append(dis_loss)
