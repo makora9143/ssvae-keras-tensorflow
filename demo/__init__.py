@@ -12,6 +12,7 @@ import tensorflow as tf
 from sklearn.preprocessing import binarize
 
 nb_classes = 72
+labels = u"あいうえおか平がきぎくぐけげこごさざしじすずせぜそぞただちぢつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもやゆよら開りるれろわん"
 app = Flask(__name__, static_url_path='/static')
 model = cvae.VAE()
 model.load('./cvae.ckpt')
@@ -39,15 +40,16 @@ def reconstruct():
     y = np.array([y_])
     x_ = model.reconstruct(x, y)
     z = model.infer(x, y)
-    result = (255 - x_ * 255).astype(np.int32).tolist()
+    result = (255 - x_*5 * 255).astype(np.int32).tolist()
 
     result += hoge(np.tile(z, [nb_classes, 1]), np.array(y_label))
+    print len(result)
 
-    return flask.jsonify({'pred':idx, 'result':result})
+    return flask.jsonify({'pred':labels[idx], 'result':result})
 
 def hoge(z, y):
     x_ = model.generate(z, y)
-    return (255 - x_ * 255).astype(np.int32).tolist()
+    return (255 - x_ *5* 255).astype(np.int32).tolist()
 
 
 if __name__ == '__main__':

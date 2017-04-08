@@ -36,9 +36,9 @@
                 <div class="col-md-12">
                     <hr>
                     <p>generate:</p>
-                    {% for i in range(10) %}
+                    {% for i in range(72) %}
                     <canvas id="digit_{{i}}" style="border:1px solid" width="140" height="140"></canvas>
-                    {% if i == 4 %}
+                    {% if i % 5 == 0 and i != 0%}
                     <br>
                     {% endif %}
                     {% endfor %}
