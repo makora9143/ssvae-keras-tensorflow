@@ -15,61 +15,60 @@ from keras.metrics import categorical_crossentropy
 class VAE(object):
     def __init__(self):
         self.batch_size = 16
-        self.z_dim = 50
-        self.epochs = 300
+        self.z_dim = 100
+        self.epochs = 400
 
         self.trained_flg = False
 
+        def my_init(shape, name=None):
+            return K.random_normal(shape, stddev=0.1)
         # encode
         self.q_net = Sequential()
         self.q_net.add(Reshape((32, 32, 1), input_shape=(32*32,)))
-        self.q_net.add(Conv2D(32, 3, padding='same', activation='relu'))
-        self.q_net.add(Conv2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.q_net.add(Conv2D(64, 3, padding='same', activation='relu'))
-        self.q_net.add(Conv2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.q_net.add(Conv2D(128, 3, padding='same', activation='relu'))
-        self.q_net.add(Conv2D(128, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Conv2D(32, 3, kernel_initializer=my_init, padding='same', activation='relu'))
+        self.q_net.add(Conv2D(32, 5, kernel_initializer=my_init, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Conv2D(64, 3, kernel_initializer=my_init, padding='same', activation='relu'))
+        self.q_net.add(Conv2D(64, 5, kernel_initializer=my_init, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Conv2D(128, 3, kernel_initializer=my_init, padding='same', activation='relu'))
+        self.q_net.add(Conv2D(128, 5, kernel_initializer=my_init, strides=(2, 2), padding='same', activation='relu'))
         self.q_net.add(Flatten())
-        self.q_net.add(Dense(1024, activation='relu'))
-        self.q_net.summary()
+        self.q_net.add(Dense(1024, kernel_initializer=my_init, activation='relu'))
 
         self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+72)])
         self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+72)])
 
         # decode
         self.p_net = Sequential()
-        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+72))
-        self.p_net.add(Dense(4*4*128, activation='relu'))
+        self.p_net.add(Dense(1024, kernel_initializer=my_init, activation='relu', input_dim=self.z_dim+72))
+        self.p_net.add(Dense(4*4*128, kernel_initializer=my_init, activation='relu'))
         self.p_net.add(Reshape((4, 4, 128)))
 
-        self.p_net.add(Conv2D(128, 3, padding='same', activation='relu'))
-        self.p_net.add(Deconv2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.p_net.add(Conv2D(64, 3, padding='same', activation='relu'))
-        self.p_net.add(Deconv2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.p_net.add(Conv2D(32, 3, padding='same', activation='relu'))
-        self.p_net.add(Deconv2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid'))
+        self.p_net.add(Conv2D(128, 3, kernel_initializer=my_init, padding='same', activation='relu'))
+        self.p_net.add(Deconv2D(64, 5, kernel_initializer=my_init, strides=(2, 2), padding='same', activation='relu'))
+        self.p_net.add(Conv2D(64, 3, kernel_initializer=my_init, padding='same', activation='relu'))
+        self.p_net.add(Deconv2D(32, 5, kernel_initializer=my_init, strides=(2, 2), padding='same', activation='relu'))
+        self.p_net.add(Conv2D(32, 3, kernel_initializer=my_init, padding='same', activation='relu'))
+        self.p_net.add(Deconv2D(1, 5, kernel_initializer=my_init, strides=(2, 2), padding='same', activation='sigmoid'))
         self.p_net.add(Flatten())
 
-        def my_init(shape, name=None):
-            return K.random_normal(shape, stddev=0.1)
 
         # cnn
         self.cnn = Sequential()
         self.cnn.add(Reshape((32, 32, 1), input_shape=(32*32,)))
-        self.cnn.add(Conv2D(32, 3, init=my_init, padding='same', activation='relu'))
-        self.cnn.add(Conv2D(32, 3, padding='same', activation='relu'))
+        self.cnn.add(Conv2D(32, 3, kernel_initializer=my_init, padding='same', activation='relu'))
+        self.cnn.add(Conv2D(32, 3, kernel_initializer=my_init, padding='same', activation='relu'))
         self.cnn.add(MaxPooling2D())
         self.cnn.add(Dropout(0.5))
 
-        self.cnn.add(Conv2D(64, 3, padding='same', activation='relu'))
-        self.cnn.add(Conv2D(64, 3, padding='same', activation='relu'))
+        self.cnn.add(Conv2D(64, 3, kernel_initializer=my_init, padding='same', activation='relu'))
+        self.cnn.add(Conv2D(64, 3, kernel_initializer=my_init, padding='same', activation='relu'))
         self.cnn.add(MaxPooling2D())
         self.cnn.add(Dropout(0.5))
 
         self.cnn.add(Flatten())
-        self.cnn.add(Dense(1024, activation='relu'))
+        self.cnn.add(Dense(1024, kernel_initializer=my_init, activation='relu'))
         self.cnn.add(Dropout(0.5))
-        self.cnn.add(Dense(72, activation='softmax'))
+        self.cnn.add(Dense(72, kernel_initializer=my_init, activation='softmax'))
 
     def _encode(self, x_ph, y_ph):
         q_h = self.q_net(x_ph)
