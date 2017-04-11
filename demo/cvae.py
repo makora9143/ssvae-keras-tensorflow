@@ -15,7 +15,6 @@ from keras.metrics import categorical_crossentropy
 class VAE(object):
     def __init__(self, mode='mnist'):
         self.batch_size = 16
-        self.z_dim = 150
         self.epochs = 300
 
         self.trained_flg = False
@@ -24,10 +23,12 @@ class VAE(object):
     def build_model(self, mode):
         if mode == 'mnist':
             self.nb_classes = 10
+            self.z_dim = 15
             self.img_row, self.img_col = 28, 28
             self.build_mnist_model()
         elif mode == 'hiragana':
             self.nb_classes = 70
+            self.z_dim = 150
             self.img_row, self.img_col = 32, 32
             self.build_hiragana_model()
         else:
@@ -50,13 +51,13 @@ class VAE(object):
             self.q_net.add(Flatten(name='hiragana_encode_flatten'))
             self.q_net.add(Dense(1024, activation='relu', name='hiragana_encode_dense'))
 
-            self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+70, name='hiragana_encode_dense_mean')])
-            self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+70, name='hiragana_encode_dense_var')])
+            self.q_net_mean = Sequential([Dense(150, input_dim=1024+70, name='hiragana_encode_dense_mean')])
+            self.q_net_log_var2 = Sequential([Dense(150, input_dim=1024+70, name='hiragana_encode_dense_var')])
 
         # decode
         with tf.variable_scope('decoder', reuse=True):
             self.p_net = Sequential()
-            self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+70, name='hiragana_decode_dense1'))
+            self.p_net.add(Dense(1024, activation='relu', input_dim=150+70, name='hiragana_decode_dense1'))
             self.p_net.add(Dense(4*4*128, activation='relu', name='hiragana_decode_dense2'))
             self.p_net.add(Reshape((4, 4, 128), name='hiragana_decode_reshape'))
 
@@ -67,7 +68,6 @@ class VAE(object):
             self.p_net.add(Conv2D(32, 3, padding='same', activation='relu', name='hiragana_decode_conv5'))
             self.p_net.add(Deconv2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid', name='hiragana_decode_conv6'))
             self.p_net.add(Flatten(name='hiragana_decode_flatten'))
-
 
         # cnn
         with tf.variable_scope('cnn', reuse=True):
@@ -87,7 +87,6 @@ class VAE(object):
             self.cnn.add(Dense(256, activation='relu', kernel_initializer=my_init, name='hiragana_cnn_dense1'))
             self.cnn.add(Dropout(0.5, name='hiragana_cnn_dropout3'))
             self.cnn.add(Dense(70, activation='softmax', kernel_initializer=my_init, name='hiragana_cnn_dense2'))
-        self.cnn.summary()
 
     def build_mnist_model(self):
 
@@ -99,12 +98,12 @@ class VAE(object):
         self.q_net.add(Flatten(name='mnist_encode_flatten'))
         self.q_net.add(Dense(1024, activation='relu', name='mnist_encode_dense'))
 
-        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+10, name='mnist_encode_dense_mean')])
-        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+10, name='mnist_encode_dense_var')])
+        self.q_net_mean = Sequential([Dense(15, input_dim=1024+10, name='mnist_encode_dense_mean')])
+        self.q_net_log_var2 = Sequential([Dense(15, input_dim=1024+10, name='mnist_encode_dense_var')])
 
         # decode
         self.p_net = Sequential()
-        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+10, name='mnist_decode_dense1'))
+        self.p_net.add(Dense(1024, activation='relu', input_dim=15+10, name='mnist_decode_dense1'))
         self.p_net.add(Dense(7*7*64, activation='relu', name='mnist_decode_dense2'))
         self.p_net.add(Reshape((7, 7, 64), name='mnist_decode_reshape'))
 
@@ -123,7 +122,6 @@ class VAE(object):
         self.cnn.add(Dense(1024, activation='relu', name='mnist_cnn_dense1'))
         self.cnn.add(Dropout(0.5, name='mnist_cnn_dropout'))
         self.cnn.add(Dense(10, activation='softmax', name='mnist_cnn_dense2'))
-        self.cnn.summary()
 
     def _encode(self, x_ph, y_ph):
         q_h = self.q_net(x_ph)

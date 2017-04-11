@@ -11,19 +11,16 @@ import tensorflow as tf
 
 from sklearn.preprocessing import binarize
 
-nb_classes = 70
-labels = u"あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよわん"
+nb_classes = 10
+hiragana_labels = u"あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよわん"
+mnist_labels= "0123456789"
+labels = mnist_labels
 app = Flask(__name__, static_url_path='/static')
 
-model = cvae.VAE('hiragana')
-model.load('./hiragana.ckpt')
+model = cvae.VAE()
+model.load('./mnist.ckpt')
 
 
-y_label = []
-for i in range(nb_classes):
-        a = [0] * nb_classes
-        a[i] = 1
-        y_label.append(a)
 
 @app.route('/')
 def hello():
@@ -35,14 +32,12 @@ def change_mode():
     print mode
     if mode == 'mnist':
         model.close()
-        model.build_mnist_model()
-        #model.load('./hiragana.ckpt')
-        #model.load('./mnist.ckpt')
-        nb_classes = 10
+        model.build_model("mnist")
+        model.load('./mnist.ckpt')
         return flask.jsonify({'msg': 'success'})
     elif mode == 'hiragana':
         model.close()
-        model.build_hiragana_model()
+        model.build_model("hiragana")
         model.load('./hiragana.ckpt')
         nb_classes = 70
         return flask.jsonify({'msg': 'success'})
@@ -56,22 +51,26 @@ def reconstruct():
         return flask.jsonify(res='error'), 400
 
     x = (255. - np.array([request.json]).astype(np.float32)) / 255.
-    idx = np.argmax(model.predict(x))
-    y_ =[0] * nb_classes
+    p_r = model.predict(x)
+    idx = np.argmax(p_r)
+    y_ =[0] * p_r.shape[1]
     y_[idx] = 1
     y = np.array([y_])
     x_ = model.reconstruct(x, y)
     z = model.infer(x, y)
-    result = (255 - x_*5 * 255).astype(np.int32).tolist()
+    y_label = []
+    for i in range(p_r.shape[1]):
+            a = [0] * p_r.shape[1]
+            a[i] = 1
+            y_label.append(a)
+    result = (255 - x_ * 255).astype(np.int32).tolist()
+    result += hoge(np.tile(z, [p_r.shape[1], 1]), np.array(y_label))
 
-    result += hoge(np.tile(z, [nb_classes, 1]), np.array(y_label))
-    print len(result)
-
-    return flask.jsonify({'pred':labels[idx], 'result':result})
+    return flask.jsonify({'pred':idx, 'result':result})
 
 def hoge(z, y):
     x_ = model.generate(z, y)
-    return (255 - x_ *5* 255).astype(np.int32).tolist()
+    return (255 - x_ * 255).astype(np.int32).tolist()
 
 
 if __name__ == '__main__':
