@@ -9,7 +9,7 @@ from keras.layers import MaxPooling2D
 from keras.layers import Dropout
 from keras.layers import Flatten
 from keras.metrics import categorical_crossentropy
-
+from keras.preprocessing.image import ImageDataGenerator
 
 
 class VAE(object):
@@ -179,6 +179,11 @@ class VAE(object):
 
         self.trained_flg = save
         self.filepath = filepath
+        datagen = ImageDataGenerator(shear_range=np.pi/6,
+                                     width_shift_range=0.15,
+                                     height_shift_range=0.15,
+                                     rotation_range=20,
+                                     zoom_range=0.2)
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -187,8 +192,11 @@ class VAE(object):
                 ave_loss = []
                 ave_cnn = []
                 idx = np.random.permutation(range(X_train.shape[0]))
-                for j in range(X_train.shape[0] / self.batch_size):
-                    batch_xs, batch_ys = X_train[j*self.batch_size: (j+1)*self.batch_size], y_train[j*self.batch_size: (j+1)*self.batch_size]
+                batches = 0
+                #for j in range(X_train.shape[0] / self.batch_size):
+                #    batch_xs, batch_ys = X_train[j*self.batch_size: (j+1)*self.batch_size], y_train[j*self.batch_size: (j+1)*self.batch_size]
+                for batch_xs, batch_ys in datagen.flow(X_train.reshape((-1, 32, 32, 1)), Y_train, batch_size=self.batch_size):
+                    batch_xs = batch_xs.reshape(-1, 32*32)
                     _, vae_loss, _, cnn_loss = sess.run([train_vae, low_bound, train_cnn, loss],
                             feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
                     ave_loss.append(vae_loss)
