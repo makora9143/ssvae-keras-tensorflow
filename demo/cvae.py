@@ -13,13 +13,27 @@ from keras.metrics import categorical_crossentropy
 
 
 class VAE(object):
-    def __init__(self):
+    def __init__(self, mode='mnist'):
         self.batch_size = 16
         self.z_dim = 100
         self.epochs = 300
 
         self.trained_flg = False
+        self.build_model(mode)
 
+    def build_model(self, mode):
+        if mode == 'mnist':
+            self.build_mnist_model()
+            self.nb_classes = 10
+            self.img_row, self.img_col = 28, 28
+        elif mode == 'hiragana':
+            self.build_hiragana_model()
+            self.nb_classes = 70
+            self.img_row, self.img_col = 32, 32
+        else:
+            return 'error'
+
+    def build_hiragana_model(self):
         # encode
         self.q_net = Sequential()
         self.q_net.add(Reshape((32, 32, 1), input_shape=(32*32,)))
@@ -31,14 +45,13 @@ class VAE(object):
         self.q_net.add(Conv2D(128, 5, strides=(2, 2), padding='same', activation='relu'))
         self.q_net.add(Flatten())
         self.q_net.add(Dense(1024, activation='relu'))
-        self.q_net.summary()
 
-        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+72)])
-        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+72)])
+        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+70)])
+        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+70)])
 
         # decode
         self.p_net = Sequential()
-        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+72))
+        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+70))
         self.p_net.add(Dense(4*4*128, activation='relu'))
         self.p_net.add(Reshape((4, 4, 128)))
 
@@ -69,7 +82,41 @@ class VAE(object):
         self.cnn.add(Flatten())
         self.cnn.add(Dense(1024, activation='relu'))
         self.cnn.add(Dropout(0.5))
-        self.cnn.add(Dense(72, activation='softmax'))
+        self.cnn.add(Dense(70, activation='softmax'))
+
+    def build_mnist_model(self):
+
+        self.q_net = Sequential()
+        self.q_net.add(Reshape((28, 28, 1), input_shape=(784,)))
+        self.q_net.add(Conv2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Conv2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.q_net.add(Flatten())
+        self.q_net.add(Dense(1024, activation='relu'))
+
+        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+10)])
+        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+10)])
+
+        # decode
+        self.p_net = Sequential()
+        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+10))
+        self.p_net.add(Dense(7*7*64, activation='relu'))
+        self.p_net.add(Reshape((7, 7, 64)))
+
+        self.p_net.add(Deconv2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
+        self.p_net.add(Deconv2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid'))
+        self.p_net.add(Flatten())
+
+        # cnn
+        self.cnn = Sequential()
+        self.cnn.add(Reshape((28, 28, 1), input_shape=(784,)))
+        self.cnn.add(Conv2D(32, 5, padding='same', activation='relu'))
+        self.cnn.add(MaxPooling2D())
+        self.cnn.add(Conv2D(64, 5, padding='same', activation='relu'))
+        self.cnn.add(MaxPooling2D())
+        self.cnn.add(Flatten())
+        self.cnn.add(Dense(1024, activation='relu'))
+        self.cnn.add(Dropout(0.5))
+        self.cnn.add(Dense(10, activation='softmax'))
 
     def _encode(self, x_ph, y_ph):
         q_h = self.q_net(x_ph)
@@ -79,8 +126,8 @@ class VAE(object):
         return q_mean, q_log_var2
 
     def infer(self, x, y):
-        x_ph = tf.placeholder(tf.float32, [None, 32*32])
-        y_ph = tf.placeholder(tf.float32, [None, 72])
+        x_ph = tf.placeholder(tf.float32, [None, self.img_row*self.img_col])
+        y_ph = tf.placeholder(tf.float32, [None, self.nb_classes])
 
         q_mean, q_log_var2 = self._encode(x_ph, y_ph)
         with tf.Session() as sess:
@@ -96,7 +143,7 @@ class VAE(object):
 
     def generate(self, z, y):
         z_ph = tf.placeholder(tf.float32, [None, self.z_dim])
-        y_ph = tf.placeholder(tf.float32, [None, 72])
+        y_ph = tf.placeholder(tf.float32, [None, self.nb_classes])
 
         p_mean = self._decode(z_ph, y_ph)
         with tf.Session() as sess:
@@ -116,8 +163,8 @@ class VAE(object):
         return p_mean
 
     def reconstruct(self, x, y):
-        x_ph = tf.placeholder(tf.float32, [None, 32*32])
-        y_ph = tf.placeholder(tf.float32, [None, 72])
+        x_ph = tf.placeholder(tf.float32, [None, self.img_row*self.img_col])
+        y_ph = tf.placeholder(tf.float32, [None, self.nb_classes])
 
         p_mean = self._reconstruct(x_ph, y_ph)
 
@@ -137,7 +184,7 @@ class VAE(object):
         return sess
 
     def predict(self, x):
-        x_ph = tf.placeholder(tf.float32, [None, 32*32])
+        x_ph = tf.placeholder(tf.float32, [None, self.img_row*self.img_col])
         pred = self.cnn(x_ph)
 
         with tf.Session() as sess:
@@ -155,8 +202,8 @@ class VAE(object):
         return D_KL
 
     def train(self, X_train, y_train, X_test, y_test, save=False, filepath='./cvae.ckpt'):
-        x_ph = tf.placeholder(tf.float32, [None, 32*32])
-        y_ph = tf.placeholder(tf.float32, [None, 72])
+        x_ph = tf.placeholder(tf.float32, [None, self.img_col*self.img_row])
+        y_ph = tf.placeholder(tf.float32, [None, self.nb_classes])
 
         q_mean, q_log_var2 = self._encode(x_ph, y_ph)
 
@@ -208,3 +255,6 @@ class VAE(object):
         self.sess = tf.Session()
         saver = tf.train.Saver()
         saver.restore(self.sess, filepath)
+
+    def close(self):
+        self.sess.close()

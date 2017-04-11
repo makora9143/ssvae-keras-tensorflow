@@ -11,11 +11,18 @@ import tensorflow as tf
 
 from sklearn.preprocessing import binarize
 
-nb_classes = 72
-labels = u"あいうえおか平がきぎくぐけげこごさざしじすずせぜそぞただちぢつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもやゆよら開りるれろわん"
+nb_classes = 70
+labels = u"あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよわん"
 app = Flask(__name__, static_url_path='/static')
-model = cvae.VAE()
+
+model = cvae.VAE('hiragana')
 model.load('./cvae.ckpt')
+
+def get_model(mode):
+    vae = cvae.VAE('hiragana')
+    vae.load('./cvae.ckpt')
+    return vae
+    
 
 y_label = []
 for i in range(nb_classes):
@@ -26,6 +33,26 @@ for i in range(nb_classes):
 @app.route('/')
 def hello():
     return render_template('index.html')
+
+@app.route('/api/change', methods=['POST'])
+def change_mode():
+    mode = request.json['mode']
+    print mode
+    if mode == 'mnist':
+        model.close()
+        model.build_mnist_model()
+#        model.load('./cvae.ckpt')
+        #model.load('./mnist.ckpt')
+        return flask.jsonify({'msg': 'success'})
+    elif mode == 'hiragana':
+        model.close()
+        model.build_hiragana_model()
+#        model = cvae.VAE('hiragana')
+#        model.load('./cvae.ckpt')
+        #model.load('./hiragana.ckpt')
+        return flask.jsonify({'msg': 'success'})
+    else:
+        return flask.jsonify({'msg': 'fail'})
 
 @app.route('/api/recon', methods=['POST'])
 def reconstruct():

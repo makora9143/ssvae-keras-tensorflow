@@ -224,6 +224,30 @@ class Main_hiragana {
         img.src = this.canvas.toDataURL();
     }
 }
+$('#mnist_tab').click(() => {
+        $.ajax({
+            url: '/api/change',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({'mode': 'mnist'}),
+            success: (data) => {
+                console.log('model change');
+            }
+        });
+    console.log('mnist change');
+});
+$('#hiragana_tab').click(() => {
+        $.ajax({
+            url: '/api/change',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({'mode': 'hiragana'}),
+            success: (data) => {
+                console.log(data);
+            }
+        });
+    console.log('hiragana change');
+});
 
 $(() => {
     var main = new Main();
