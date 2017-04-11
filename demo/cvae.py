@@ -34,12 +34,12 @@ class VAE(object):
         self.q_net.add(Flatten())
         self.q_net.add(Dense(1024, kernel_initializer=my_init, activation='relu'))
 
-        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+72)])
-        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+72)])
+        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+70)])
+        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+70)])
 
         # decode
         self.p_net = Sequential()
-        self.p_net.add(Dense(1024, kernel_initializer=my_init, activation='relu', input_dim=self.z_dim+72))
+        self.p_net.add(Dense(1024, kernel_initializer=my_init, activation='relu', input_dim=self.z_dim+70))
         self.p_net.add(Dense(4*4*128, kernel_initializer=my_init, activation='relu'))
         self.p_net.add(Reshape((4, 4, 128)))
 
@@ -68,7 +68,7 @@ class VAE(object):
         self.cnn.add(Flatten())
         self.cnn.add(Dense(1024, kernel_initializer=my_init, activation='relu'))
         self.cnn.add(Dropout(0.5))
-        self.cnn.add(Dense(72, kernel_initializer=my_init, activation='softmax'))
+        self.cnn.add(Dense(70, kernel_initializer=my_init, activation='softmax'))
 
     def _encode(self, x_ph, y_ph):
         q_h = self.q_net(x_ph)
@@ -79,7 +79,7 @@ class VAE(object):
 
     def infer(self, x, y):
         x_ph = tf.placeholder(tf.float32, [None, 32*32])
-        y_ph = tf.placeholder(tf.float32, [None, 72])
+        y_ph = tf.placeholder(tf.float32, [None, 70])
 
         q_mean, q_log_var2 = self._encode(x_ph, y_ph)
         with tf.Session() as sess:
@@ -95,7 +95,7 @@ class VAE(object):
 
     def generate(self, z, y):
         z_ph = tf.placeholder(tf.float32, [None, self.z_dim])
-        y_ph = tf.placeholder(tf.float32, [None, 72])
+        y_ph = tf.placeholder(tf.float32, [None, 70])
 
         p_mean = self._decode(z_ph, y_ph)
         with tf.Session() as sess:
@@ -116,7 +116,7 @@ class VAE(object):
 
     def reconstruct(self, x, y):
         x_ph = tf.placeholder(tf.float32, [None, 32*32])
-        y_ph = tf.placeholder(tf.float32, [None, 72])
+        y_ph = tf.placeholder(tf.float32, [None, 70])
 
         p_mean = self._reconstruct(x_ph, y_ph)
 
@@ -155,7 +155,7 @@ class VAE(object):
 
     def train(self, X_train, y_train, X_test, y_test, save=False, filepath='./cvae.ckpt'):
         x_ph = tf.placeholder(tf.float32, [None, 32*32])
-        y_ph = tf.placeholder(tf.float32, [None, 72])
+        y_ph = tf.placeholder(tf.float32, [None, 70])
 
         q_mean, q_log_var2 = self._encode(x_ph, y_ph)
 
@@ -195,12 +195,15 @@ class VAE(object):
                 batches = 0
                 #for j in range(X_train.shape[0] / self.batch_size):
                 #    batch_xs, batch_ys = X_train[j*self.batch_size: (j+1)*self.batch_size], y_train[j*self.batch_size: (j+1)*self.batch_size]
-                for batch_xs, batch_ys in datagen.flow(X_train.reshape((-1, 32, 32, 1)), Y_train, batch_size=self.batch_size):
+                for batch_xs, batch_ys in datagen.flow(X_train.reshape((-1, 32, 32, 1)), y_train, batch_size=self.batch_size):
                     batch_xs = batch_xs.reshape(-1, 32*32)
                     _, vae_loss, _, cnn_loss = sess.run([train_vae, low_bound, train_cnn, loss],
                             feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
                     ave_loss.append(vae_loss)
                     ave_cnn.append(cnn_loss)
+                    batches += 1
+                    if batches > (X_train.shape[0] / self.batch_size):
+                        break
                 result = np.mean(ave_loss)
                 cnn_result = np.mean(ave_cnn)
                 print i+1, result, cnn_result
