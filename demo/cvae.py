@@ -15,7 +15,7 @@ from keras.metrics import categorical_crossentropy
 class VAE(object):
     def __init__(self):
         self.batch_size = 16
-        self.z_dim = 50
+        self.z_dim = 100
         self.epochs = 300
 
         self.trained_flg = False
