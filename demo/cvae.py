@@ -15,7 +15,7 @@ from keras.preprocessing.image import ImageDataGenerator
 class VAE(object):
     def __init__(self):
         self.batch_size = 16
-        self.z_dim = 100
+        self.z_dim = 150
         self.epochs = 400
 
         self.trained_flg = False
@@ -67,6 +67,8 @@ class VAE(object):
 
         self.cnn.add(Flatten())
         self.cnn.add(Dense(1024, kernel_initializer=my_init, activation='relu'))
+        self.cnn.add(Dropout(0.5))
+        self.cnn.add(Dense(256, kernel_initializer=my_init, activation='relu'))
         self.cnn.add(Dropout(0.5))
         self.cnn.add(Dense(70, kernel_initializer=my_init, activation='softmax'))
 
@@ -153,7 +155,7 @@ class VAE(object):
         D_KL = 0.5 * tf.reduce_sum(1 + log_var2 - mean **2 - tf.exp(log_var2), axis=-1)
         return D_KL
 
-    def train(self, X_train, y_train, X_test, y_test, save=False, filepath='./cvae.ckpt'):
+    def train(self, X_train, y_train, X_test, y_test, save=False, filepath='./hiragana.ckpt'):
         x_ph = tf.placeholder(tf.float32, [None, 32*32])
         y_ph = tf.placeholder(tf.float32, [None, 70])
 
@@ -179,9 +181,9 @@ class VAE(object):
 
         self.trained_flg = save
         self.filepath = filepath
-        datagen = ImageDataGenerator(shear_range=np.pi/6,
-                                     width_shift_range=0.15,
-                                     height_shift_range=0.15,
+        datagen = ImageDataGenerator(shear_range=np.pi/12,
+                                     width_shift_range=0.1,
+                                     height_shift_range=0.1,
                                      rotation_range=20,
                                      zoom_range=0.2)
 
@@ -196,6 +198,8 @@ class VAE(object):
                 #for j in range(X_train.shape[0] / self.batch_size):
                 #    batch_xs, batch_ys = X_train[j*self.batch_size: (j+1)*self.batch_size], y_train[j*self.batch_size: (j+1)*self.batch_size]
                 for batch_xs, batch_ys in datagen.flow(X_train.reshape((-1, 32, 32, 1)), y_train, batch_size=self.batch_size):
+                    batch_xs -= np.min(batch_xs, axis=(1, 2, 3), keepdims=True)
+                    batch_xs *= 1 / np.max(batch_xs, axis=(1, 2, 3), keepdims=True)
                     batch_xs = batch_xs.reshape(-1, 32*32)
                     _, vae_loss, _, cnn_loss = sess.run([train_vae, low_bound, train_cnn, loss],
                             feed_dict={x_ph: batch_xs, y_ph: batch_ys, K.learning_phase(): 1})
