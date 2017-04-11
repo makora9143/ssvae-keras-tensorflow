@@ -1,4 +1,4 @@
 checkpoint
-cvae.ckpt.index
-cvae.ckpt.meta
-cvae.ckpt.data-00000-of-00001
+*.ckpt.index
+*.ckpt.meta
+*.ckpt.data-00000-of-00001

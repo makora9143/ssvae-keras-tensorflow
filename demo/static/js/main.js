@@ -80,10 +80,10 @@ class Main {
                 }
             }
             if (Math.min(...inputs) === 255) {
-                draw_digit(this.recon, data);
+                draw_digit(this.recon, data, 28);
                 document.getElementById('answer').innerHTML = '';
                 for(var i = 0; i < 10; i++) {
-                    draw_digit(document.getElementById('digit_'+i), data);
+                    draw_digit(document.getElementById('digit_'+i), data, 28);
                 }
 
 
@@ -190,7 +190,7 @@ class Main_hiragana {
         this.col = 32
         var ctx = this.input.getContext('2d');
         var img = new Image();
-        var labels = "あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよわん"
+        var labels = "あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよらりるれろわん"
         img.onload = () => {
             var inputs = [];
             var small = document.createElement('canvas').getContext('2d');
@@ -205,10 +205,10 @@ class Main_hiragana {
                 }
             }
             if (Math.min(...inputs) === 255) {
-                draw_digit(this.recon, data);
+                draw_digit(this.recon, data, 32);
                 document.getElementById('answer_hiragana').innerHTML = '';
                 for(var i = 0; i < 70; i++) {
-                    draw_digit(document.getElementById('hiragana_'+i), data);
+                    draw_digit(document.getElementById('hiragana_'+i), data, 32);
                 }
 
 
