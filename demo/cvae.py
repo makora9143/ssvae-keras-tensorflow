@@ -15,7 +15,7 @@ from keras.metrics import categorical_crossentropy
 class VAE(object):
     def __init__(self, mode='mnist'):
         self.batch_size = 16
-        self.z_dim = 100
+        self.z_dim = 150
         self.epochs = 300
 
         self.trained_flg = False
@@ -23,100 +23,107 @@ class VAE(object):
 
     def build_model(self, mode):
         if mode == 'mnist':
-            self.build_mnist_model()
             self.nb_classes = 10
             self.img_row, self.img_col = 28, 28
+            self.build_mnist_model()
         elif mode == 'hiragana':
-            self.build_hiragana_model()
             self.nb_classes = 70
             self.img_row, self.img_col = 32, 32
+            self.build_hiragana_model()
         else:
             return 'error'
 
     def build_hiragana_model(self):
+        K.clear_session()
         # encode
-        self.q_net = Sequential()
-        self.q_net.add(Reshape((32, 32, 1), input_shape=(32*32,)))
-        self.q_net.add(Conv2D(32, 3, padding='same', activation='relu'))
-        self.q_net.add(Conv2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.q_net.add(Conv2D(64, 3, padding='same', activation='relu'))
-        self.q_net.add(Conv2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.q_net.add(Conv2D(128, 3, padding='same', activation='relu'))
-        self.q_net.add(Conv2D(128, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.q_net.add(Flatten())
-        self.q_net.add(Dense(1024, activation='relu'))
-
-        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+70)])
-        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+70)])
-
-        # decode
-        self.p_net = Sequential()
-        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+70))
-        self.p_net.add(Dense(4*4*128, activation='relu'))
-        self.p_net.add(Reshape((4, 4, 128)))
-
-        self.p_net.add(Conv2D(128, 3, padding='same', activation='relu'))
-        self.p_net.add(Deconv2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.p_net.add(Conv2D(64, 3, padding='same', activation='relu'))
-        self.p_net.add(Deconv2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.p_net.add(Conv2D(32, 3, padding='same', activation='relu'))
-        self.p_net.add(Deconv2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid'))
-        self.p_net.add(Flatten())
-
         def my_init(shape, name=None):
             return K.random_normal(shape, stddev=0.1)
+        with tf.variable_scope('encoder', reuse=True):
+            self.q_net = Sequential()
+            self.q_net.add(Reshape((32, 32, 1), input_shape=(32*32,), name='hiragana_encode_reshape'))
+            self.q_net.add(Conv2D(32, 3, padding='same', activation='relu', name='hiragana_encode_conv1'))
+            self.q_net.add(Conv2D(32, 5, strides=(2, 2), padding='same', activation='relu', name='hiragana_encode_conv2'))
+            self.q_net.add(Conv2D(64, 3, padding='same', activation='relu', name='hiragana_encode_conv3'))
+            self.q_net.add(Conv2D(64, 5, strides=(2, 2), padding='same', activation='relu', name='hiragana_encode_conv4'))
+            self.q_net.add(Conv2D(128, 3, padding='same', activation='relu', name='hiragana_encode_conv5'))
+            self.q_net.add(Conv2D(128, 5, strides=(2, 2), padding='same', activation='relu', name='hiragana_encode_conv6'))
+            self.q_net.add(Flatten(name='hiragana_encode_flatten'))
+            self.q_net.add(Dense(1024, activation='relu', name='hiragana_encode_dense'))
+
+            self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+70, name='hiragana_encode_dense_mean')])
+            self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+70, name='hiragana_encode_dense_var')])
+
+        # decode
+        with tf.variable_scope('decoder', reuse=True):
+            self.p_net = Sequential()
+            self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+70, name='hiragana_decode_dense1'))
+            self.p_net.add(Dense(4*4*128, activation='relu', name='hiragana_decode_dense2'))
+            self.p_net.add(Reshape((4, 4, 128), name='hiragana_decode_reshape'))
+
+            self.p_net.add(Conv2D(128, 3, padding='same', activation='relu', name='hiragana_decode_conv1'))
+            self.p_net.add(Deconv2D(64, 5, strides=(2, 2), padding='same', activation='relu', name='hiragana_decode_conv2'))
+            self.p_net.add(Conv2D(64, 3, padding='same', activation='relu', name='hiragana_decode_conv3'))
+            self.p_net.add(Deconv2D(32, 5, strides=(2, 2), padding='same', activation='relu', name='hiragana_decode_conv4'))
+            self.p_net.add(Conv2D(32, 3, padding='same', activation='relu', name='hiragana_decode_conv5'))
+            self.p_net.add(Deconv2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid', name='hiragana_decode_conv6'))
+            self.p_net.add(Flatten(name='hiragana_decode_flatten'))
+
 
         # cnn
-        self.cnn = Sequential()
-        self.cnn.add(Reshape((32, 32, 1), input_shape=(32*32,)))
-        self.cnn.add(Conv2D(32, 3, init=my_init, padding='same', activation='relu'))
-        self.cnn.add(Conv2D(32, 3, padding='same', activation='relu'))
-        self.cnn.add(MaxPooling2D())
-        self.cnn.add(Dropout(0.5))
+        with tf.variable_scope('cnn', reuse=True):
+            self.cnn = Sequential()
+            self.cnn.add(Reshape((32, 32, 1), input_shape=(32*32,), name='hiragana_cnn_reshape'))
+            self.cnn.add(Conv2D(32, 3, kernel_initializer=my_init, padding='same', activation='relu', name='hiragana_cnn_conv1'))
+            self.cnn.add(Conv2D(32, 3, kernel_initializer=my_init, padding='same', activation='relu', name='hiragana_cnn_conv2'))
+            self.cnn.add(MaxPooling2D(name='hiragana_cnn_maxpool1'))
+            self.cnn.add(Dropout(0.5, name='hiragana_cnn_dropout1'))
 
-        self.cnn.add(Conv2D(64, 3, padding='same', activation='relu'))
-        self.cnn.add(Conv2D(64, 3, padding='same', activation='relu'))
-        self.cnn.add(MaxPooling2D())
-        self.cnn.add(Dropout(0.5))
+            self.cnn.add(Conv2D(64, 3, padding='same', kernel_initializer=my_init, activation='relu', name='hiragana_cnn_conv3'))
+            self.cnn.add(Conv2D(64, 3, padding='same', kernel_initializer=my_init, activation='relu', name='hiragana_cnn_conv4'))
+            self.cnn.add(MaxPooling2D(name='hiragana_cnn_maxpool2'))
+            self.cnn.add(Dropout(0.5, name='hiragana_cnn_dropout2'))
 
-        self.cnn.add(Flatten())
-        self.cnn.add(Dense(1024, activation='relu'))
-        self.cnn.add(Dropout(0.5))
-        self.cnn.add(Dense(70, activation='softmax'))
+            self.cnn.add(Flatten(name='hiragana_cnn_flatten'))
+            self.cnn.add(Dense(256, activation='relu', kernel_initializer=my_init, name='hiragana_cnn_dense1'))
+            self.cnn.add(Dropout(0.5, name='hiragana_cnn_dropout3'))
+            self.cnn.add(Dense(70, activation='softmax', kernel_initializer=my_init, name='hiragana_cnn_dense2'))
+        self.cnn.summary()
 
     def build_mnist_model(self):
 
+        K.clear_session()
         self.q_net = Sequential()
-        self.q_net.add(Reshape((28, 28, 1), input_shape=(784,)))
-        self.q_net.add(Conv2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.q_net.add(Conv2D(64, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.q_net.add(Flatten())
-        self.q_net.add(Dense(1024, activation='relu'))
+        self.q_net.add(Reshape((28, 28, 1), input_shape=(784,), name='mnist_encode_reshape'))
+        self.q_net.add(Conv2D(32, 5, strides=(2, 2), padding='same', activation='relu', name='mnist_encode_conv1'))
+        self.q_net.add(Conv2D(64, 5, strides=(2, 2), padding='same', activation='relu', name='mnist_encode_conv2'))
+        self.q_net.add(Flatten(name='mnist_encode_flatten'))
+        self.q_net.add(Dense(1024, activation='relu', name='mnist_encode_dense'))
 
-        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+10)])
-        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+10)])
+        self.q_net_mean = Sequential([Dense(self.z_dim, input_dim=1024+10, name='mnist_encode_dense_mean')])
+        self.q_net_log_var2 = Sequential([Dense(self.z_dim, input_dim=1024+10, name='mnist_encode_dense_var')])
 
         # decode
         self.p_net = Sequential()
-        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+10))
-        self.p_net.add(Dense(7*7*64, activation='relu'))
-        self.p_net.add(Reshape((7, 7, 64)))
+        self.p_net.add(Dense(1024, activation='relu', input_dim=self.z_dim+10, name='mnist_decode_dense1'))
+        self.p_net.add(Dense(7*7*64, activation='relu', name='mnist_decode_dense2'))
+        self.p_net.add(Reshape((7, 7, 64), name='mnist_decode_reshape'))
 
-        self.p_net.add(Deconv2D(32, 5, strides=(2, 2), padding='same', activation='relu'))
-        self.p_net.add(Deconv2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid'))
-        self.p_net.add(Flatten())
+        self.p_net.add(Deconv2D(32, 5, strides=(2, 2), padding='same', activation='relu', name='mnist_decode_conv1'))
+        self.p_net.add(Deconv2D(1, 5, strides=(2, 2), padding='same', activation='sigmoid', name='mnist_decode_conv2'))
+        self.p_net.add(Flatten(name='mnist_decode_flatten'))
 
         # cnn
         self.cnn = Sequential()
-        self.cnn.add(Reshape((28, 28, 1), input_shape=(784,)))
-        self.cnn.add(Conv2D(32, 5, padding='same', activation='relu'))
-        self.cnn.add(MaxPooling2D())
-        self.cnn.add(Conv2D(64, 5, padding='same', activation='relu'))
-        self.cnn.add(MaxPooling2D())
-        self.cnn.add(Flatten())
-        self.cnn.add(Dense(1024, activation='relu'))
-        self.cnn.add(Dropout(0.5))
-        self.cnn.add(Dense(10, activation='softmax'))
+        self.cnn.add(Reshape((28, 28, 1), input_shape=(784,), name='mnist_cnn_reshape'))
+        self.cnn.add(Conv2D(32, 5, padding='same', activation='relu', name='mnist_cnn_conv1'))
+        self.cnn.add(MaxPooling2D(name='mnist_cnn_maxpooling1'))
+        self.cnn.add(Conv2D(64, 5, padding='same', activation='relu', name='mnist_cnn_conv2'))
+        self.cnn.add(MaxPooling2D(name='mnist_cnn_maxpooling2'))
+        self.cnn.add(Flatten(name='mnist_cnn_flatten'))
+        self.cnn.add(Dense(1024, activation='relu', name='mnist_cnn_dense1'))
+        self.cnn.add(Dropout(0.5, name='mnist_cnn_dropout'))
+        self.cnn.add(Dense(10, activation='softmax', name='mnist_cnn_dense2'))
+        self.cnn.summary()
 
     def _encode(self, x_ph, y_ph):
         q_h = self.q_net(x_ph)
@@ -253,6 +260,8 @@ class VAE(object):
         self.filepath = filepath
         self.trained_flg = True
         self.sess = tf.Session()
+        #saver = tf.train.import_meta_graph(filepath)
+        #saver.restore(self.sess, tf.train.latest_checkpoint('./'))
         saver = tf.train.Saver()
         saver.restore(self.sess, filepath)
 

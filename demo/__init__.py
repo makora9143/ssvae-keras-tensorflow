@@ -16,13 +16,8 @@ labels = u"あいうえおかきくけこがぎぐげごさしすせそざじず
 app = Flask(__name__, static_url_path='/static')
 
 model = cvae.VAE('hiragana')
-model.load('./cvae.ckpt')
+model.load('./hiragana.ckpt')
 
-def get_model(mode):
-    vae = cvae.VAE('hiragana')
-    vae.load('./cvae.ckpt')
-    return vae
-    
 
 y_label = []
 for i in range(nb_classes):
@@ -41,15 +36,15 @@ def change_mode():
     if mode == 'mnist':
         model.close()
         model.build_mnist_model()
-#        model.load('./cvae.ckpt')
+        #model.load('./hiragana.ckpt')
         #model.load('./mnist.ckpt')
+        nb_classes = 10
         return flask.jsonify({'msg': 'success'})
     elif mode == 'hiragana':
         model.close()
         model.build_hiragana_model()
-#        model = cvae.VAE('hiragana')
-#        model.load('./cvae.ckpt')
-        #model.load('./hiragana.ckpt')
+        model.load('./hiragana.ckpt')
+        nb_classes = 70
         return flask.jsonify({'msg': 'success'})
     else:
         return flask.jsonify({'msg': 'fail'})
